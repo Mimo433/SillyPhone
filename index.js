@@ -2745,7 +2745,7 @@ function _buildSettingsHTML() {
     return `
 <div id="sillyphone_settings" class="inline-drawer">
   <div class="inline-drawer-toggle inline-drawer-header">
-    <b>SillyPhone</b>
+    <b>📱 SillyPhone</b>
     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
   </div>
   <div class="inline-drawer-content">
