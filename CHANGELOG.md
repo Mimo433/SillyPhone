@@ -12,8 +12,13 @@ The Reddit app has been transformed into a fully interactive platform:
 - **User Profiles & Following**: Clicking any `u/username` opens their dynamically generated profile page with a bio and recent posts. You can follow users to see them in your Following tab.
 - **Refresh Activity**: A `↻` button on user profiles allows you to generate new recent posts while strictly maintaining the user's existing bio/vibe.
 - **Direct Messages**: You can start private DM threads with any Reddit user from their profile. The AI acts as the internet stranger, and chats are saved in the Reddit "Chats" tab.
-- **Comment Threads & Replying**: You can now post top-level comments and reply to specific comments. The AI will immediately dynamically reply to your comments to create living arguments and discussions!
 - **Load More Comments**: A `↻ Load More` button in comment sections passes the existing thread to the AI to append new comments, expanding the conversation organically.
+
+#### **Image Generation Integration 🖼️**
+- **Dynamic Image Prompts**: Reddit posts now dynamically prompt the AI to generate a visual description if the post contains an attached photo.
+- **Inline Generation**: Posts with visual descriptions will display a `🖼️ Click to generate image` placeholder. Clicking this executes a background slash command to generate the image directly inline within the post.
+- **Customizable Command**: In the SillyPhone settings, you can define exactly which slash command is used to generate images (e.g., `/draw "{{prompt}}"`, `/imagine quiet=true "{{prompt}}"`).
+- **Customizable AI Instructions**: You can also define the exact instructions given to the AI on *how* to write the image prompt. For example, you can instruct it to use "comma-separated Danbooru tags" if you are generating images via a local Stable Diffusion model!
 
 #### **"Put Down Phone" Feature**
 - Added a floating `⬇️ Put down phone` button above the phone screen.
