@@ -713,7 +713,7 @@ function _buildPhonePanel() {
     _phoneEl.style.position = 'fixed';
     
     const putDownBtn = `
-    <div id="rpg_phone_putdown_btn" style="position:absolute; top:-40px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.1); backdrop-filter:blur(10px); color:white; padding:8px 16px; border-radius:20px; font-weight:bold; cursor:pointer; font-size:13px; box-shadow:0 4px 12px rgba(0,0,0,0.5); z-index:100; border:1px solid rgba(255,255,255,0.2); white-space:nowrap;">
+    <div id="rpg_phone_putdown_btn" style="position:absolute; top:-40px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.1); backdrop-filter:blur(10px); color:white; padding:8px 16px; border-radius:20px; font-weight:bold; cursor:pointer; font-size:13px; box-shadow:0 4px 12px rgba(0,0,0,0.5); z-index:100; border:1px solid rgba(255,255,255,0.2); white-space:nowrap; pointer-events:all; user-select:none;">
       ⬇️ Put down phone
     </div>`;
 
