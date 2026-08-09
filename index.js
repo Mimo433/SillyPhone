@@ -98,6 +98,7 @@ function getPhoneState() {
     if (!cs.phoneVotes)    cs.phoneVotes     = {};
     if (!cs.phoneRedditJoinedSubs) cs.phoneRedditJoinedSubs = [];
     if (!cs.phoneRedditFollowing)  cs.phoneRedditFollowing  = [];
+    if (!cs.phoneRedditSavedPosts) cs.phoneRedditSavedPosts = [];
     if (!cs.phoneRedditDMs)        cs.phoneRedditDMs        = {};
     return cs;
 }
@@ -1135,6 +1136,7 @@ async function _renderRedditApp(pageId, params, screen) {
   <button class="rpg-phone-reddit-tab ${activeTab === 'joined' ? 'active' : ''}" data-tab="joined">Joined</button>
   <button class="rpg-phone-reddit-tab ${activeTab === 'following' ? 'active' : ''}" data-tab="following">Following</button>
   <button class="rpg-phone-reddit-tab ${activeTab === 'dms' ? 'active' : ''}" data-tab="dms">Chats</button>
+  <button class="rpg-phone-reddit-tab ${activeTab === 'saved' ? 'active' : ''}" data-tab="saved">Saved</button>
 </div>`;
 
     const bindTabs = () => {
@@ -1145,6 +1147,7 @@ async function _renderRedditApp(pageId, params, screen) {
                 else if (tab === 'joined') _navigateTo('reddit', 'joined_subs');
                 else if (tab === 'following') _navigateTo('reddit', 'following');
                 else if (tab === 'dms') _navigateTo('reddit', 'dm_list');
+                else if (tab === 'saved') _navigateTo('reddit', 'saved');
             });
         });
     };
@@ -1190,6 +1193,31 @@ async function _renderRedditApp(pageId, params, screen) {
             renderHome(subs);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('home', params, screen); });
         } catch (e) { screen.innerHTML = `${renderTabs('discover')}<div class="rpg-phone-error">Reddit unavailable: ${_escHtml(e.message)}</div>`; bindTabs(); }
+        return;
+    }
+
+    if (pageId === 'saved') {
+        _setNavTitle('Saved Posts');
+        const saved = ps.phoneRedditSavedPosts || [];
+        const items = saved.length === 0 ? '<p class="rpg-phone-muted" style="padding:12px;text-align:center;">No saved posts yet.</p>' : '';
+        screen.innerHTML = `${renderTabs('saved')}<div>${items}</div>`;
+        bindTabs();
+        if (saved.length > 0) {
+            const postsHTML = saved.map((p, i) => `
+<div class="rpg-phone-reddit-post" data-saved-idx="${i}" style="border:1px solid rgba(255,255,255,0.1);margin:8px 16px;border-radius:8px;cursor:pointer;">
+  <div class="rpg-phone-reddit-post-meta">${_escHtml(p.sub || 'r/all')}</div>
+  <div class="rpg-phone-reddit-post-title">${_escHtml(p.title || '')}</div>
+  <div class="rpg-phone-reddit-post-meta">⬆ ${p.upvotes || 0} · 💬 ${p.comments || 0}</div>
+</div>`).join('');
+            screen.insertAdjacentHTML('beforeend', postsHTML);
+            screen.querySelectorAll('.rpg-phone-reddit-post').forEach(el => {
+                el.addEventListener('click', () => {
+                    const idx = parseInt(el.dataset.savedIdx, 10);
+                    const p = saved[idx];
+                    _navigateTo('reddit', 'post', { sub: p.sub || 'r/all', post: p });
+                });
+            });
+        }
         return;
     }
 
@@ -1358,6 +1386,7 @@ ${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">Y
   <div style="display:flex;gap:8px;justify-content:center;">
     <button class="rpg-phone-reddit-btn ${isFollowing ? '' : 'primary'}" id="rph_follow_user">${isFollowing ? 'Following' : 'Follow'}</button>
     <button class="rpg-phone-reddit-btn" id="rph_dm_user">Message</button>
+    <button class="rpg-phone-reddit-btn" id="rph_refresh_profile" title="Refresh Activity">↻</button>
   </div>
 </div>
 <div>${postsHtml}</div>`;
@@ -1369,6 +1398,24 @@ ${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">Y
             });
             document.getElementById('rph_dm_user')?.addEventListener('click', () => {
                 _navigateTo('reddit', 'dm_thread', { user });
+            });
+            document.getElementById('rph_refresh_profile')?.addEventListener('click', async () => {
+                const btn = document.getElementById('rph_refresh_profile');
+                btn.disabled = true;
+                btn.textContent = '...';
+                const sys = `You generate a Reddit user profile. Reply ONLY valid JSON.`;
+                const usr = `Generate 5 NEW recent posts for reddit user ${user}. Maintain this established vibe/bio:\n"${data.bio}"\nFormat: {"bio":"${data.bio}","recentPosts":[{"title":"","sub":"r/name","upvotes":0,"comments":0}]}`;
+                try {
+                    const raw = await sendPhoneRequest(sys, usr);
+                    const match = raw.match(/\{[\s\S]*\}/);
+                    if (match) {
+                        const newData = JSON.parse(match[0]);
+                        data.recentPosts = newData.recentPosts;
+                        ps.phoneCache[cacheKey] = data;
+                        savePhoneState();
+                        _renderRedditApp('profile', params, screen);
+                    }
+                } catch(e) { console.warn('Profile refresh failed', e); btn.disabled = false; btn.textContent = '↻'; }
             });
             screen.querySelectorAll('.rpg-phone-reddit-post').forEach(el => {
                 el.addEventListener('click', () => {
@@ -1516,19 +1563,39 @@ function _renderRedditSubList(screen, subs, tabsHtml = '') {
 }
 
 function _renderRedditFeed(screen, sub, posts) {
-    const postsHTML = posts.map((p, i) => `
+    const ps = getPhoneState();
+    const postsHTML = posts.map((p, i) => {
+        const isSaved = ps.phoneRedditSavedPosts.some(sp => sp.title === p.title && sp.sub === sub);
+        return `
 <div class="rpg-phone-reddit-post" data-idx="${i}">
   ${p.flair ? `<span class="rpg-phone-reddit-flair">${_escHtml(p.flair)}</span>` : ''}
   <div class="rpg-phone-reddit-post-title">${_escHtml(p.title || '')}</div>
-  <div class="rpg-phone-reddit-post-meta">
-    <span>⬆ ${p.upvotes || 0}</span>
-    <span>💬 ${p.comments || 0}</span>
-    <span class="rpg-phone-reddit-user-link">${_escHtml(p.author || '')}</span>
+  <div class="rpg-phone-reddit-post-meta" style="display:flex; justify-content:space-between; align-items:center;">
+    <div>
+      <span>⬆ ${p.upvotes || 0}</span>
+      <span style="margin-left:8px">💬 ${p.comments || 0}</span>
+      <span class="rpg-phone-reddit-user-link" style="margin-left:8px">${_escHtml(p.author || '')}</span>
+    </div>
+    <span class="rpg-phone-reddit-save-btn" data-idx="${i}" style="cursor:pointer; font-size:16px;">${isSaved ? '🔖' : '📑'}</span>
   </div>
   ${p.preview ? `<div class="rpg-phone-reddit-post-preview">${_escHtml(p.preview)}</div>` : ''}
-</div>`).join('');
+</div>`;
+    }).join('');
     screen.innerHTML = `<div class="rpg-phone-reddit-sub-header">${_escHtml(sub)}</div>${postsHTML}`;
     _bindRedditUserLinks(screen);
+    screen.querySelectorAll('.rpg-phone-reddit-save-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = parseInt(btn.dataset.idx, 10);
+            const p = posts[idx];
+            p.sub = sub;
+            const existingIdx = ps.phoneRedditSavedPosts.findIndex(sp => sp.title === p.title && sp.sub === sub);
+            if (existingIdx >= 0) ps.phoneRedditSavedPosts.splice(existingIdx, 1);
+            else ps.phoneRedditSavedPosts.push(p);
+            savePhoneState();
+            btn.textContent = existingIdx >= 0 ? '📑' : '🔖';
+        });
+    });
     screen.querySelectorAll('.rpg-phone-reddit-post').forEach(el => {
         el.addEventListener('click', () => {
             const idx = parseInt(el.dataset.idx, 10);
@@ -1574,14 +1641,18 @@ function _renderRedditPost(screen, post, sub, data) {
   ${post.flair ? `<span class="rpg-phone-reddit-flair">${_escHtml(post.flair)}</span>` : ''}
   <div class="rpg-phone-reddit-post-detail-title">${_escHtml(post.title || '')}</div>
   <div class="rpg-phone-reddit-post-body">${_escHtml(data.body || '')}</div>
-  <div class="rpg-phone-reddit-post-actions">
+  <div class="rpg-phone-reddit-post-actions" style="display:flex; align-items:center;">
     <button class="rpg-phone-vote-btn ${vote > 0 ? 'voted-up' : ''}" id="rph_vote_up">⬆</button>
     <span class="rpg-phone-vote-score ${vote > 0 ? 'vote-up' : vote < 0 ? 'vote-down' : ''}" id="rph_vote_score">${(post.upvotes || 0) + vote}</span>
     <button class="rpg-phone-vote-btn ${vote < 0 ? 'voted-down' : ''}" id="rph_vote_dn">⬇</button>
     <span style="margin-left:8px">💬 ${post.comments || 0}</span>
+    <button class="rpg-phone-reddit-btn" id="rph_save_post" style="margin-left:auto; padding:2px 8px;">${ps.phoneRedditSavedPosts.some(sp => sp.title === post.title) ? 'Saved 🔖' : 'Save 📑'}</button>
   </div>
   <div class="rpg-phone-reddit-comments-section">
-    <h4>Comments</h4>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <h4 style="margin:0;">Comments</h4>
+      <button class="rpg-phone-reddit-btn" id="rph_load_more_comments" style="padding:2px 8px;font-size:12px;">↻ Load More</button>
+    </div>
     <div class="rpg-phone-reddit-input-box" style="margin-bottom:16px;">
       <input type="text" class="rpg-phone-input-small" id="rph_main_comment_input" placeholder="Add a comment..." style="flex:1" autocomplete="off"/>
       <button class="rpg-phone-reddit-btn primary" id="rph_main_comment_btn">Post</button>
@@ -1607,6 +1678,37 @@ function _renderRedditPost(screen, post, sub, data) {
     };
     upBtn?.addEventListener('click', () => updateVote(1));
     dnBtn?.addEventListener('click', () => updateVote(-1));
+
+    document.getElementById('rph_save_post')?.addEventListener('click', (e) => {
+        const btn = e.target;
+        post.sub = sub;
+        const existingIdx = ps.phoneRedditSavedPosts.findIndex(sp => sp.title === post.title);
+        if (existingIdx >= 0) { ps.phoneRedditSavedPosts.splice(existingIdx, 1); btn.textContent = 'Save 📑'; }
+        else { ps.phoneRedditSavedPosts.push(post); btn.textContent = 'Saved 🔖'; }
+        savePhoneState();
+    });
+
+    document.getElementById('rph_load_more_comments')?.addEventListener('click', async () => {
+        const btn = document.getElementById('rph_load_more_comments');
+        btn.disabled = true;
+        btn.textContent = '...';
+        const sceneCtx = _buildSceneContext(800);
+        const sys = `You write Reddit comments. Reply ONLY valid JSON array.`;
+        const historyStr = data.comments.map(c => `${c.author}: ${c.text}`).join('\n');
+        const usr = `${sceneCtx}\n\nPost Title: "${post.title}"\nExisting Comments:\n${historyStr}\n\nGenerate 3 NEW top-level comments to append to this thread from strangers on the internet. Format: [{"author":"u/name","upvotes":0,"text":"comment text","replies":[]}]`;
+        try {
+            const raw = await sendPhoneRequest(sys, usr);
+            const match = raw.match(/\[[\s\S]*\]/);
+            if (match) {
+                const newComms = JSON.parse(match[0]);
+                data.comments = data.comments.concat(newComms);
+                const cacheKey = `reddit_post_${sub}_${encodeURIComponent(post.title || '')}`;
+                ps.phoneCache[cacheKey] = data;
+                savePhoneState();
+                _renderRedditPost(screen, post, sub, data);
+            }
+        } catch(e) { console.warn('Load more comments failed', e); btn.disabled = false; btn.textContent = '↻ Load More'; }
+    });
 
     // Handle Commenting / Replying
     const addCommentToData = async (text, pathStr) => {
