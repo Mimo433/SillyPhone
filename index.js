@@ -1106,7 +1106,7 @@ async function _renderRedditApp(pageId, params, screen) {
         const cacheKey = 'reddit_subs';
         if (ps.phoneCache[cacheKey]) { _renderRedditSubList(screen, ps.phoneCache[cacheKey]); return; }
         const sceneCtx = _buildSceneContext(1000);
-        const sys = `You generate a list of reddit-like communities fitting this story world. Reply ONLY valid JSON array.`;
+        const sys = `You generate a list of reddit-like communities fitting this story world. The internet is vast — create GENERAL interest communities, NOT things specifically about the player character or their friends. Reply ONLY valid JSON array.`;
         const usr = `${sceneCtx}\n\nGenerate 6 relevant subreddits for this world. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
         try {
             const raw  = await sendPhoneRequest(sys, usr);
@@ -1126,7 +1126,7 @@ async function _renderRedditApp(pageId, params, screen) {
         const cacheKey = `reddit_feed_${sub}`;
         if (ps.phoneCache[cacheKey]) { _renderRedditFeed(screen, sub, ps.phoneCache[cacheKey]); return; }
         const sceneCtx = _buildSceneContext(1000);
-        const sys = `You generate realistic Reddit posts for the community ${sub} in this story world. Reply ONLY valid JSON array.`;
+        const sys = `You generate realistic Reddit posts for the community ${sub} in this story world. IMPORTANT: These posts are written by strangers on the internet. They should NOT be about the player character, their close friends, or the immediate chat context. Make them general, random, and worldly. Reply ONLY valid JSON array.`;
         const usr = `${sceneCtx}\n\nGenerate 6 Reddit posts for ${sub}. Format: [{"title":"","flair":"","author":"u/name","upvotes":0,"comments":0,"preview":"short preview text"}]`;
         try {
             const raw   = await sendPhoneRequest(sys, usr);
@@ -1148,7 +1148,7 @@ async function _renderRedditApp(pageId, params, screen) {
         if (ps.phoneCache[cacheKey]) { _renderRedditPost(screen, post, params.sub, ps.phoneCache[cacheKey]); return; }
 
         const sceneCtx = _buildSceneContext(1000);
-        const sys = `You write the body text and comments for a Reddit post in this story world. Reply ONLY valid JSON.`;
+        const sys = `You write the body text and comments for a Reddit post in this story world. IMPORTANT: The author and commenters are strangers on the internet. Do NOT mention the player character or their friends. Keep it realistic to a general internet forum. Reply ONLY valid JSON.`;
         const usr = `${sceneCtx}\n\nWrite the body and top comments for this Reddit post in ${params.sub}:\nTitle: "${post.title}"\nFlair: ${post.flair || ''}\nPreview: ${post.preview || ''}\n\nReply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","upvotes":0,"text":"comment text","replies":[{"author":"u/name","upvotes":0,"text":"reply"}]}]}`;
         try {
             const raw   = await sendPhoneRequest(sys, usr);
