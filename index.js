@@ -949,8 +949,12 @@ function _renderHomeScreen() {
 
 function _parsePhoneImages(text) {
     if (!text) return '';
+    const ps = getPhoneState();
     return text.replace(/\[IMAGE:\s*(.*?)\]/gi, (match, desc) => {
         const cleanDesc = desc.trim();
+        if (ps.phoneImageCache && ps.phoneImageCache[cleanDesc]) {
+            return `<img src="${_escHtml(ps.phoneImageCache[cleanDesc])}" style="width:100%;border-radius:8px;cursor:pointer;display:block;margin-bottom:8px;" onclick="window.open(this.src,'_blank')" />`;
+        }
         return `<div class="rpg-phone-image-placeholder" data-img-prompt="${_escHtml(cleanDesc)}" role="button" tabindex="0">
             <div class="rpg-phone-image-prompt" style="font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:8px;font-style:italic;">"${_escHtml(cleanDesc)}"</div>
             <span>🖼️ Click to generate image</span>
@@ -1026,6 +1030,10 @@ function _bindPhoneImages(screen) {
             
             _showPhoneImagePopup(desc, async (result) => {
                 if (result.type === 'upload') {
+                    const ps = getPhoneState();
+                    if (!ps.phoneImageCache) ps.phoneImageCache = {};
+                    ps.phoneImageCache[desc] = result.dataUrl;
+                    savePhoneState();
                     el.innerHTML = `<img src="${_escHtml(result.dataUrl)}" style="width:100%;border-radius:8px;cursor:pointer;display:block;" onclick="window.open(this.src,'_blank')" />`;
                     el.style.cssText = 'border:none;padding:0;background:transparent;';
                     el.dataset.generating = 'done';
@@ -1039,6 +1047,10 @@ function _bindPhoneImages(screen) {
                             const cmd = result.cmd.replace('{{prompt}}', escapedPrompt);
                             const res = await ctx.executeSlashCommandsWithOptions(cmd);
                             if (res?.pipe) {
+                                const ps = getPhoneState();
+                                if (!ps.phoneImageCache) ps.phoneImageCache = {};
+                                ps.phoneImageCache[desc] = res.pipe;
+                                savePhoneState();
                                 el.innerHTML = `<img src="${_escHtml(res.pipe)}" style="width:100%;border-radius:8px;cursor:pointer;display:block;" onclick="window.open(this.src,'_blank')" />`;
                                 el.style.cssText = 'border:none;padding:0;background:transparent;';
                                 el.dataset.generating = 'done';
