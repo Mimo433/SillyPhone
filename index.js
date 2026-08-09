@@ -2745,15 +2745,15 @@ function _buildSettingsHTML() {
     return `
 <div id="sillyphone_settings" class="inline-drawer">
   <div class="inline-drawer-toggle inline-drawer-header">
-    <b>📱 SillyPhone Settings</b>
-    <div class="inline-drawer-icon fa-solid fa-chevron-down down"></div>
+    <b>SillyPhone</b>
+    <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
   </div>
   <div class="inline-drawer-content">
 
     <div class="inline-drawer">
       <div class="inline-drawer-toggle inline-drawer-header">
         <b>⚙️ General</b>
-        <div class="inline-drawer-icon fa-solid fa-chevron-down down"></div>
+        <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
       </div>
       <div class="inline-drawer-content">
         <div class="sillyphone-setting-row" style="margin-bottom:8px;">
@@ -2768,7 +2768,7 @@ function _buildSettingsHTML() {
     <div class="inline-drawer">
       <div class="inline-drawer-toggle inline-drawer-header">
         <b>💬 Chat & Actions</b>
-        <div class="inline-drawer-icon fa-solid fa-chevron-down down"></div>
+        <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
       </div>
       <div class="inline-drawer-content">
         <div class="sillyphone-setting-row" style="margin-bottom:8px;">
@@ -2786,7 +2786,7 @@ function _buildSettingsHTML() {
     <div class="inline-drawer">
       <div class="inline-drawer-toggle inline-drawer-header">
         <b>🖼️ Image Generation</b>
-        <div class="inline-drawer-icon fa-solid fa-chevron-down down"></div>
+        <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
       </div>
       <div class="inline-drawer-content">
         <div class="sillyphone-setting-row" style="margin-bottom:12px;">
@@ -2803,7 +2803,7 @@ function _buildSettingsHTML() {
     <div class="inline-drawer">
       <div class="inline-drawer-toggle inline-drawer-header">
         <b>👥 Context & NPC</b>
-        <div class="inline-drawer-icon fa-solid fa-chevron-down down"></div>
+        <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
       </div>
       <div class="inline-drawer-content">
         <div class="sillyphone-setting-row" style="margin-bottom:8px;">
