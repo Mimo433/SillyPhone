@@ -1,0 +1,11 @@
+{
+  "display_name": "SillyPhone",
+  "version": "1.0.0",
+  "author": "Mimo433",
+  "homePage": "https://github.com/Mimo433/SillyPhone",
+  "description": "A full smartphone simulation overlay for SillyTavern — browse, text, call NPCs, install custom apps, browse Reddit, Google, take photos, and more. NPC contacts fire automatically based on relationship scores.",
+  "js": "index.js",
+  "css": "style.css",
+  "auto_update": true,
+  "minimum_client_version": "1.10.0"
+}
