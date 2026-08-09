@@ -991,7 +991,7 @@ function _showPhoneImagePopup(desc, onResult) {
             </div>
         </div>
     `;
-    const container = document.getElementById('sillyphone-container') || document.body;
+    const container = document.getElementById('sillyphone_panel') || document.body;
     container.appendChild(overlay);
 
     const close = () => overlay.remove();
