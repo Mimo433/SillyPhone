@@ -1453,6 +1453,10 @@ ${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">Y
             const raw = await sendPhoneRequest(sys, usr);
             const match = raw.match(/\{[\s\S]*\}/);
             const data = match ? JSON.parse(match[0]) : { bio: '', recentPosts: [] };
+            if (params.sourcePost && params.sourcePost.author === user) {
+                data.recentPosts = data.recentPosts.filter(p => p.title !== params.sourcePost.title);
+                data.recentPosts.unshift(params.sourcePost);
+            }
             ps.phoneCache[cacheKey] = data; savePhoneState();
             renderProfile(data);
         } catch (e) { screen.innerHTML = `<div class="rpg-phone-error">Profile failed: ${_escHtml(e.message)}</div>`; }
@@ -1546,8 +1550,12 @@ function _bindRedditUserLinks(screen) {
         el.addEventListener('click', (e) => {
             e.stopPropagation();
             let context = '';
+            let originalPost = null;
             const postEl = el.closest('.rpg-phone-reddit-post, .rpg-phone-reddit-post-detail');
             if (postEl) {
+                if (postEl.dataset.postJson) {
+                    try { originalPost = JSON.parse(postEl.dataset.postJson); } catch (e) {}
+                }
                 const title = postEl.querySelector('.rpg-phone-reddit-post-title, .rpg-phone-reddit-post-detail-title')?.textContent;
                 if (title) context += `Post Title: "${title}"\n`;
             }
@@ -1556,7 +1564,7 @@ function _bindRedditUserLinks(screen) {
                 const text = commentEl.querySelector('.rpg-phone-reddit-comment-text')?.textContent;
                 if (text) context += `Commented: "${text}"\n`;
             }
-            _navigateTo('reddit', 'profile', { user: el.textContent.trim(), context: context.trim() });
+            _navigateTo('reddit', 'profile', { user: el.textContent.trim(), context: context.trim(), sourcePost: originalPost });
         });
     });
 }
@@ -1581,7 +1589,7 @@ function _renderRedditFeed(screen, sub, posts) {
     const postsHTML = posts.map((p, i) => {
         const isSaved = ps.phoneRedditSavedPosts.some(sp => sp.title === p.title && sp.sub === sub);
         return `
-<div class="rpg-phone-reddit-post" data-idx="${i}">
+<div class="rpg-phone-reddit-post" data-idx="${i}" data-post-json="${_escHtml(JSON.stringify(p))}">
   ${p.flair ? `<span class="rpg-phone-reddit-flair">${_escHtml(p.flair)}</span>` : ''}
   <div class="rpg-phone-reddit-post-title">${_escHtml(p.title || '')}</div>
   <div class="rpg-phone-reddit-post-meta" style="display:flex; justify-content:space-between; align-items:center;">
@@ -1651,13 +1659,12 @@ function _renderRedditPost(screen, post, sub, data) {
     const commentsHTML = renderComments(data.comments);
 
     screen.innerHTML = `
-<div class="rpg-phone-reddit-post-detail">
+<div class="rpg-phone-reddit-post-detail" data-post-json="${_escHtml(JSON.stringify(post))}">
   <div class="rpg-phone-reddit-post-meta" style="margin-bottom:8px;"><span class="rpg-phone-reddit-user-link">${_escHtml(post.author || '')}</span></div>
   ${post.flair ? `<span class="rpg-phone-reddit-flair">${_escHtml(post.flair)}</span>` : ''}
   <div class="rpg-phone-reddit-post-detail-title">${_escHtml(post.title || '')}</div>
   ${post.imagePrompt ? `<div style="margin-bottom:12px;">${_parsePhoneImages(`[IMAGE: ${post.imagePrompt}]`)}</div>` : ''}
   ${data.imagePrompt && data.imagePrompt !== post.imagePrompt ? `<div style="margin-bottom:12px;">${_parsePhoneImages(`[IMAGE: ${data.imagePrompt}]`)}</div>` : ''}
-  <div class="rpg-phone-reddit-post-detail-title">${_escHtml(post.title || '')}</div>
   <div class="rpg-phone-reddit-post-body">${_escHtml(data.body || '')}</div>
   <div class="rpg-phone-reddit-post-actions" style="display:flex; align-items:center;">
     <button class="rpg-phone-vote-btn ${vote > 0 ? 'voted-up' : ''}" id="rph_vote_up">⬆</button>
