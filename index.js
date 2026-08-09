@@ -49,6 +49,8 @@ const DEFAULTS = {
     multihogMode: false,
     autoPutDownMessage: true,
     putDownMessageToTextbox: false,
+    imageGenCommand: '/imagine quiet=true "{{prompt}}"',
+    imagePromptInstruction: 'detailed visual description of the photo if applicable, else empty string',
 };
 
 function getSettings() {
@@ -968,11 +970,12 @@ function _bindPhoneImages(screen) {
             el.dataset.generating = 'true';
             el.innerHTML = '<span>⏳ Generating image…</span>';
             try {
+                const s = getSettings();
                 const ctx = getSTContext();
-                // Try ST's built-in /imagine slash command
                 if (ctx.executeSlashCommandsWithOptions) {
                     const escapedPrompt = desc.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-                    const result = await ctx.executeSlashCommandsWithOptions(`/imagine quiet=true "${escapedPrompt}"`);
+                    const cmd = (s.imageGenCommand || '/imagine quiet=true "{{prompt}}"').replace('{{prompt}}', escapedPrompt);
+                    const result = await ctx.executeSlashCommandsWithOptions(cmd);
                     if (result?.pipe) {
                         el.innerHTML = `<img src="${_escHtml(result.pipe)}" style="width:100%;border-radius:8px;cursor:pointer;display:block;" onclick="window.open(this.src,'_blank')" />`;
                         el.style.cssText = 'border:none;padding:0;background:transparent;';
@@ -1333,9 +1336,10 @@ ${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">Y
         const customSub = ps.phoneRedditJoinedSubs.find(s => s.name === sub);
         const subCtx = customSub && customSub.description ? `This community is about: ${customSub.description}` : '';
 
+        const s = getSettings();
         const sceneCtx = _buildSceneContext(1000);
         const sys = `You generate realistic Reddit posts for the community ${sub} in this story world. IMPORTANT: These posts are written by strangers on the internet. They should NOT be about the player character, their close friends, or the immediate chat context. Make them general, random, and worldly. Reply ONLY valid JSON array.`;
-        const usr = `${sceneCtx}\n\n${subCtx}\nGenerate 6 Reddit posts for ${sub}. Format: [{"title":"","flair":"","author":"u/name","upvotes":0,"comments":0,"preview":"short preview text"}]`;
+        const usr = `${sceneCtx}\n\n${subCtx}\nGenerate 6 Reddit posts for ${sub}. Format: [{"title":"","flair":"","author":"u/name","upvotes":0,"comments":0,"preview":"short preview text","imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>"}]`;
         try {
             const raw   = await sendPhoneRequest(sys, usr);
             const match  = raw.match(/\[[\s\S]*\]/);
@@ -1359,9 +1363,10 @@ ${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">Y
             return;
         }
 
+        const s = getSettings();
         const sceneCtx = _buildSceneContext(1000);
         const sys = `You write the body text and comments for a Reddit post in this story world. IMPORTANT: The author and commenters are strangers on the internet. Do NOT mention the player character or their friends. Keep it realistic to a general internet forum. Reply ONLY valid JSON.`;
-        const usr = `${sceneCtx}\n\nWrite the body and top comments for this Reddit post in ${params.sub}:\nTitle: "${post.title}"\nFlair: ${post.flair || ''}\nPreview: ${post.preview || ''}\n\nReply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","upvotes":0,"text":"comment text","replies":[{"author":"u/name","upvotes":0,"text":"reply"}]}]}`;
+        const usr = `${sceneCtx}\n\nWrite the body and top comments for this Reddit post in ${params.sub}:\nTitle: "${post.title}"\nFlair: ${post.flair || ''}\nPreview: ${post.preview || ''}\n\nReply ONLY with: {"body":"full post body text","imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>","comments":[{"author":"u/name","upvotes":0,"text":"comment text","replies":[{"author":"u/name","upvotes":0,"text":"reply"}]}]}`;
         try {
             const raw   = await sendPhoneRequest(sys, usr);
             const match  = raw.match(/\{[\s\S]*\}/);
@@ -1587,6 +1592,7 @@ function _renderRedditFeed(screen, sub, posts) {
     </div>
     <span class="rpg-phone-reddit-save-btn" data-idx="${i}" style="cursor:pointer; font-size:16px;">${isSaved ? '🔖' : '📑'}</span>
   </div>
+  ${p.imagePrompt ? `<div style="margin-top:8px;">${_parsePhoneImages(`[IMAGE: ${p.imagePrompt}]`)}</div>` : ''}
   ${p.preview ? `<div class="rpg-phone-reddit-post-preview">${_escHtml(p.preview)}</div>` : ''}
 </div>`;
     }).join('');
@@ -1648,6 +1654,9 @@ function _renderRedditPost(screen, post, sub, data) {
 <div class="rpg-phone-reddit-post-detail">
   <div class="rpg-phone-reddit-post-meta" style="margin-bottom:8px;"><span class="rpg-phone-reddit-user-link">${_escHtml(post.author || '')}</span></div>
   ${post.flair ? `<span class="rpg-phone-reddit-flair">${_escHtml(post.flair)}</span>` : ''}
+  <div class="rpg-phone-reddit-post-detail-title">${_escHtml(post.title || '')}</div>
+  ${post.imagePrompt ? `<div style="margin-bottom:12px;">${_parsePhoneImages(`[IMAGE: ${post.imagePrompt}]`)}</div>` : ''}
+  ${data.imagePrompt && data.imagePrompt !== post.imagePrompt ? `<div style="margin-bottom:12px;">${_parsePhoneImages(`[IMAGE: ${data.imagePrompt}]`)}</div>` : ''}
   <div class="rpg-phone-reddit-post-detail-title">${_escHtml(post.title || '')}</div>
   <div class="rpg-phone-reddit-post-body">${_escHtml(data.body || '')}</div>
   <div class="rpg-phone-reddit-post-actions" style="display:flex; align-items:center;">
@@ -2496,8 +2505,10 @@ async function _capturePhoto(mode, customDesc, statusEl) {
         let imageUrl = null;
         try {
             if (ctx.executeSlashCommandsWithOptions) {
+                const s = getSettings();
                 const escaped = prompt.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-                const result  = await ctx.executeSlashCommandsWithOptions(`/imagine quiet=true "${escaped}"`);
+                const cmd = (s.imageGenCommand || '/imagine quiet=true "{{prompt}}"').replace('{{prompt}}', escaped);
+                const result  = await ctx.executeSlashCommandsWithOptions(cmd);
                 if (result?.pipe) imageUrl = result.pipe;
             }
         } catch (genErr) { console.warn('[SillyPhone] Camera generate failed:', genErr); }
@@ -2601,6 +2612,14 @@ function _renderPhoneSettingsApp(pageId, params, screen) {
     <input type="checkbox" id="rpg_phone_putdown_textbox_toggle" ${s.putDownMessageToTextbox ? 'checked' : ''}/>
   </label>
   <label class="rpg-phone-settings-row">
+    <span style="flex:1">Image Gen Slash Command<br><small style="color:rgba(255,255,255,0.5)">Use {{prompt}} for prompt insertion</small></span>
+    <input type="text" id="rpg_phone_img_cmd" class="rpg-phone-input-small" style="width:140px;" value="${_escHtml(s.imageGenCommand || '/imagine quiet=true "{{prompt}}"')}"/>
+  </label>
+  <label class="rpg-phone-settings-row">
+    <span style="flex:1">AI Image Prompt Instructions<br><small style="color:rgba(255,255,255,0.5)">How AI should write the image prompt</small></span>
+    <input type="text" id="rpg_phone_img_inst" class="rpg-phone-input-small" style="width:140px;" value="${_escHtml(s.imagePromptInstruction || 'detailed visual description of the photo if applicable, else empty string')}"/>
+  </label>
+  <label class="rpg-phone-settings-row">
     <span>Context depth (events in AI context)</span>
     <input type="range" min="1" max="100" value="${s.contextDepth || 20}" id="rpg_phone_ctx_depth_slider"/>
     <span id="rpg_phone_ctx_depth_val">${s.contextDepth || 20}</span>
@@ -2618,6 +2637,8 @@ function _renderPhoneSettingsApp(pageId, params, screen) {
     document.getElementById('rpg_phone_multihog_toggle')?.addEventListener('change', e => { s.multihogMode = e.target.checked; saveSettings(); });
     document.getElementById('rpg_phone_autoputdown_toggle')?.addEventListener('change', e => { s.autoPutDownMessage = e.target.checked; saveSettings(); });
     document.getElementById('rpg_phone_putdown_textbox_toggle')?.addEventListener('change', e => { s.putDownMessageToTextbox = e.target.checked; saveSettings(); });
+    document.getElementById('rpg_phone_img_cmd')?.addEventListener('change', e => { s.imageGenCommand = e.target.value; saveSettings(); });
+    document.getElementById('rpg_phone_img_inst')?.addEventListener('change', e => { s.imagePromptInstruction = e.target.value; saveSettings(); });
     const depthSlider = document.getElementById('rpg_phone_ctx_depth_slider');
     const depthVal    = document.getElementById('rpg_phone_ctx_depth_val');
     depthSlider?.addEventListener('input', () => { s.contextDepth = parseInt(depthSlider.value, 10); if (depthVal) depthVal.textContent = depthSlider.value; saveSettings(); });
@@ -2660,6 +2681,15 @@ function _buildSettingsHTML() {
   <div class="sillyphone-setting-row">
     <label><input type="checkbox" id="sp_putdown_textbox_cb" ${s.putDownMessageToTextbox ? 'checked' : ''}/> Place "Put down" message in textbox instead of sending</label>
   </div>
+  <h4>Image Generation</h4>
+  <div class="sillyphone-setting-row">
+    <label style="flex:1" title="Use {{prompt}} to inject the visual description">Slash Command</label>
+    <input type="text" id="sp_img_cmd" style="flex:2;background:var(--SmartThemeDarkerColor);color:var(--SmartThemeBodyColor);border:1px solid var(--SmartThemeBorderColor);border-radius:4px;padding:2px 4px;" value="${_escHtml(s.imageGenCommand || '/imagine quiet=true "{{prompt}}"')}"/>
+  </div>
+  <div class="sillyphone-setting-row">
+    <label style="flex:1" title="Instructions given to the AI on how to write the image prompt">AI Instruction</label>
+    <input type="text" id="sp_img_inst" style="flex:2;background:var(--SmartThemeDarkerColor);color:var(--SmartThemeBodyColor);border:1px solid var(--SmartThemeBorderColor);border-radius:4px;padding:2px 4px;" value="${_escHtml(s.imagePromptInstruction || 'detailed visual description of the photo if applicable, else empty string')}"/>
+  </div>
   <h4>Context & NPC</h4>
   <div class="sillyphone-setting-row">
     <label style="flex:1">Context Depth</label>
@@ -2695,6 +2725,8 @@ function _bindSettingsPanel() {
     document.getElementById('sp_multihog_cb')?.addEventListener('change', e => { s.multihogMode = e.target.checked; saveSettings(); });
     document.getElementById('sp_autoputdown_cb')?.addEventListener('change', e => { s.autoPutDownMessage = e.target.checked; saveSettings(); });
     document.getElementById('sp_putdown_textbox_cb')?.addEventListener('change', e => { s.putDownMessageToTextbox = e.target.checked; saveSettings(); });
+    document.getElementById('sp_img_cmd')?.addEventListener('change', e => { s.imageGenCommand = e.target.value; saveSettings(); });
+    document.getElementById('sp_img_inst')?.addEventListener('change', e => { s.imagePromptInstruction = e.target.value; saveSettings(); });
     const ctxSlider = document.getElementById('sp_ctx_depth');
     const ctxLabel  = document.getElementById('sp_ctx_depth_label');
     ctxSlider?.addEventListener('input', () => { s.contextDepth = parseInt(ctxSlider.value, 10); if (ctxLabel) ctxLabel.textContent = ctxSlider.value; saveSettings(); });
