@@ -1,0 +1,34 @@
+# SillyPhone Changelog
+
+## [1.2.0] - Reddit Expansion & QoL Updates
+
+### ✨ New Features
+
+#### **Massive Reddit Expansion**
+The Reddit app has been transformed into a fully interactive platform:
+- **Tabs Navigation**: Added a bottom navigation bar with 5 tabs: **Discover**, **Joined**, **Following**, **Chats**, and **Saved**.
+- **Search & Custom Communities**: Added a search bar to jump to any subreddit. You can now also create "Custom Subs" by specifying a name, icon, and description, which heavily guides the AI's content generation for that community.
+- **Join & Save**: You can now `Join` communities to add them to your Joined tab. Every post also has a `📑 Save` button to bookmark it into your Saved tab for later reading.
+- **User Profiles & Following**: Clicking any `u/username` opens their dynamically generated profile page with a bio and recent posts. You can follow users to see them in your Following tab.
+- **Refresh Activity**: A `↻` button on user profiles allows you to generate new recent posts while strictly maintaining the user's existing bio/vibe.
+- **Direct Messages**: You can start private DM threads with any Reddit user from their profile. The AI acts as the internet stranger, and chats are saved in the Reddit "Chats" tab.
+- **Comment Threads & Replying**: You can now post top-level comments and reply to specific comments. The AI will immediately dynamically reply to your comments to create living arguments and discussions!
+- **Load More Comments**: A `↻ Load More` button in comment sections passes the existing thread to the AI to append new comments, expanding the conversation organically.
+
+#### **"Put Down Phone" Feature**
+- Added a floating `⬇️ Put down phone` button above the phone screen.
+- Automatically tracks how many minutes you spent on the phone.
+- When clicked, it injects a message into the roleplay chat: `*You put down the phone after using it for X minutes.*`
+- This triggers the AI to naturally react to you finishing your phone usage.
+- Added explicit AI instructions in the phone context block to use the recent phone activity to summarize what you were doing.
+- **New Settings**: 
+  - Toggle to completely disable the auto-send feature.
+  - Toggle to place the message into your chat textbox (so you can edit it) instead of automatically sending it.
+
+#### **Multihog Integration**
+- Added `Multihog Mode` setting. When enabled, SillyPhone dynamically reads the active Player Character's name and bio from the SillyTavern-MultihogDnDFramework state, ensuring your Reddit replies and SMS contexts perfectly match your current Multihog persona.
+
+### 🐛 Bug Fixes & Improvements
+- **Floating Action Button (FAB) Physics**: Refactored the floating phone icon to correctly distinguish between a click (to open the phone) and a drag (to move the icon), fixing the issue where clicking the icon would sometimes just drag it.
+- **Reddit AI Directives**: Implemented strict instructions across all Reddit system prompts to prevent "Main Character Syndrome." Reddit posts are now strictly about general worldly events, random internet culture, and unrelated strangers, rather than centering on the player character.
+- **Context Preservation**: Profile generation now passes the specific post/comment context where the user was found, ensuring the generated profile accurately reflects the personality of their recent comment.

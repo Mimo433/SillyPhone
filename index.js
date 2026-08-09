@@ -48,6 +48,7 @@ const DEFAULTS = {
     chatData: {},
     multihogMode: false,
     autoPutDownMessage: true,
+    putDownMessageToTextbox: false,
 };
 
 function getSettings() {
@@ -719,9 +720,17 @@ function _buildPhonePanel() {
         if (s.autoPutDownMessage !== false) {
             const minutes = Math.max(1, Math.round((Date.now() - _phoneSessionStartTime) / 60000));
             const msg = `*You put down the phone after using it for ${minutes} minute${minutes > 1 ? 's' : ''}.*`;
-            const ctx = getSTContext();
-            if (ctx.executeSlashCommandsWithOptions) {
-                ctx.executeSlashCommandsWithOptions(`/send ${msg}`);
+            if (s.putDownMessageToTextbox) {
+                const ta = document.getElementById('send_textarea');
+                if (ta) {
+                    ta.value = ta.value ? ta.value + '\n' + msg : msg;
+                    ta.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            } else {
+                const ctx = getSTContext();
+                if (ctx.executeSlashCommandsWithOptions) {
+                    ctx.executeSlashCommandsWithOptions(`/send ${msg}`);
+                }
             }
         }
         closePhone();
@@ -2588,6 +2597,10 @@ function _renderPhoneSettingsApp(pageId, params, screen) {
     <input type="checkbox" id="rpg_phone_autoputdown_toggle" ${s.autoPutDownMessage !== false ? 'checked' : ''}/>
   </label>
   <label class="rpg-phone-settings-row">
+    <span>Place "Put down" message in textbox instead of sending directly</span>
+    <input type="checkbox" id="rpg_phone_putdown_textbox_toggle" ${s.putDownMessageToTextbox ? 'checked' : ''}/>
+  </label>
+  <label class="rpg-phone-settings-row">
     <span>Context depth (events in AI context)</span>
     <input type="range" min="1" max="100" value="${s.contextDepth || 20}" id="rpg_phone_ctx_depth_slider"/>
     <span id="rpg_phone_ctx_depth_val">${s.contextDepth || 20}</span>
@@ -2604,6 +2617,7 @@ function _renderPhoneSettingsApp(pageId, params, screen) {
     document.getElementById('rpg_phone_card_ctx_toggle')?.addEventListener('change', e => { s.includeCardContext = e.target.checked; saveSettings(); });
     document.getElementById('rpg_phone_multihog_toggle')?.addEventListener('change', e => { s.multihogMode = e.target.checked; saveSettings(); });
     document.getElementById('rpg_phone_autoputdown_toggle')?.addEventListener('change', e => { s.autoPutDownMessage = e.target.checked; saveSettings(); });
+    document.getElementById('rpg_phone_putdown_textbox_toggle')?.addEventListener('change', e => { s.putDownMessageToTextbox = e.target.checked; saveSettings(); });
     const depthSlider = document.getElementById('rpg_phone_ctx_depth_slider');
     const depthVal    = document.getElementById('rpg_phone_ctx_depth_val');
     depthSlider?.addEventListener('input', () => { s.contextDepth = parseInt(depthSlider.value, 10); if (depthVal) depthVal.textContent = depthSlider.value; saveSettings(); });
@@ -2643,6 +2657,9 @@ function _buildSettingsHTML() {
   <div class="sillyphone-setting-row">
     <label><input type="checkbox" id="sp_autoputdown_cb" ${s.autoPutDownMessage !== false ? 'checked' : ''}/> Auto-send "Put down phone" message to chat</label>
   </div>
+  <div class="sillyphone-setting-row">
+    <label><input type="checkbox" id="sp_putdown_textbox_cb" ${s.putDownMessageToTextbox ? 'checked' : ''}/> Place "Put down" message in textbox instead of sending</label>
+  </div>
   <h4>Context & NPC</h4>
   <div class="sillyphone-setting-row">
     <label style="flex:1">Context Depth</label>
@@ -2677,6 +2694,7 @@ function _bindSettingsPanel() {
     document.getElementById('sp_card_ctx_cb')?.addEventListener('change', e => { s.includeCardContext = e.target.checked; saveSettings(); });
     document.getElementById('sp_multihog_cb')?.addEventListener('change', e => { s.multihogMode = e.target.checked; saveSettings(); });
     document.getElementById('sp_autoputdown_cb')?.addEventListener('change', e => { s.autoPutDownMessage = e.target.checked; saveSettings(); });
+    document.getElementById('sp_putdown_textbox_cb')?.addEventListener('change', e => { s.putDownMessageToTextbox = e.target.checked; saveSettings(); });
     const ctxSlider = document.getElementById('sp_ctx_depth');
     const ctxLabel  = document.getElementById('sp_ctx_depth_label');
     ctxSlider?.addEventListener('input', () => { s.contextDepth = parseInt(ctxSlider.value, 10); if (ctxLabel) ctxLabel.textContent = ctxSlider.value; saveSettings(); });
