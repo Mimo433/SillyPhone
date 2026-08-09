@@ -1697,6 +1697,7 @@ function _renderRedditFeed(screen, sub, posts) {
             _navigateTo('reddit', 'post', { sub, post: posts[idx] });
         });
     });
+    _bindPhoneImages(screen);
 }
 
 function _renderRedditPost(screen, post, sub, data) {
@@ -1734,8 +1735,7 @@ function _renderRedditPost(screen, post, sub, data) {
   <div class="rpg-phone-reddit-post-meta" style="margin-bottom:8px;"><span class="rpg-phone-reddit-user-link">${_escHtml(post.author || '')}</span></div>
   ${post.flair ? `<span class="rpg-phone-reddit-flair">${_escHtml(post.flair)}</span>` : ''}
   <div class="rpg-phone-reddit-post-detail-title">${_escHtml(post.title || '')}</div>
-  ${post.imagePrompt ? `<div style="margin-bottom:12px;">${_parsePhoneImages(`[IMAGE: ${post.imagePrompt}]`)}</div>` : ''}
-  ${data.imagePrompt && data.imagePrompt !== post.imagePrompt ? `<div style="margin-bottom:12px;">${_parsePhoneImages(`[IMAGE: ${data.imagePrompt}]`)}</div>` : ''}
+  ${(data.imagePrompt || post.imagePrompt) ? `<div style="margin-bottom:12px;">${_parsePhoneImages(`[IMAGE: ${data.imagePrompt || post.imagePrompt}]`)}</div>` : ''}
   <div class="rpg-phone-reddit-post-body">${_escHtml(data.body || '')}</div>
   <div class="rpg-phone-reddit-post-actions" style="display:flex; align-items:center;">
     <button class="rpg-phone-vote-btn ${vote > 0 ? 'voted-up' : ''}" id="rph_vote_up">⬆</button>
@@ -1758,6 +1758,7 @@ function _renderRedditPost(screen, post, sub, data) {
 </div>`;
 
     _bindRedditUserLinks(screen);
+    _bindPhoneImages(screen);
 
     const scoreEl = screen.querySelector('#rph_vote_score');
     const upBtn   = screen.querySelector('#rph_vote_up');
