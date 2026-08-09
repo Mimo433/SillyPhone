@@ -1708,7 +1708,7 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
                 btn.disabled = true;
                 btn.textContent = '...';
                 const sys = `You generate a Reddit user profile. Reply ONLY valid JSON.`;
-                const usr = `Generate 5 NEW recent posts for reddit user ${user}. Maintain this established vibe/bio:\n"${data.bio}"\nFormat: {"bio":"${data.bio}","recentPosts":[{"title":"","sub":"r/name","upvotes":0,"comments":0}]}`;
+                const usr = `Generate 5 NEW recent posts for reddit user ${user}. Maintain this established vibe/bio:\n"${data.bio}"\nFormat: {"bio":"${data.bio}","recentPosts":[{"title":"","sub":"r/name","upvotes":0,"comments":0,"imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>"}]}`;
                 try {
                     const raw = await sendPhoneRequest(sys, usr);
                     const match = raw.match(/\{[\s\S]*\}/);
@@ -1737,7 +1737,7 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
 
         const sys = `You generate a Reddit user profile. Reply ONLY valid JSON.`;
         const profileCtx = params.context ? `This user was found via this context:\n${params.context}\nMake sure their bio and recent posts align with this personality.` : '';
-        const usr = `Generate a realistic profile for reddit user ${user}. ${profileCtx}\nFormat: {"bio":"short bio","recentPosts":[{"title":"","sub":"r/name","upvotes":0,"comments":0}]}`;
+        const usr = `Generate a realistic profile for reddit user ${user}. ${profileCtx}\nFormat: {"bio":"short bio","recentPosts":[{"title":"","sub":"r/name","upvotes":0,"comments":0,"imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>"}]}`;
         try {
             screen.innerHTML = `<div class="rpg-phone-loading"><div class="rpg-phone-spinner"></div><p>Loading Profile…</p></div>`;
             const raw = await sendPhoneRequest(sys, usr);
