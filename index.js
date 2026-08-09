@@ -1318,7 +1318,11 @@ ${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">Y
                 btn.textContent = joined ? 'Joined' : 'Join';
                 btn.onclick = () => {
                     if (joined) ps.phoneRedditJoinedSubs = ps.phoneRedditJoinedSubs.filter(s => s.name !== sub);
-                    else ps.phoneRedditJoinedSubs.push({ name: sub, icon: '🤖', description: '' });
+                    else {
+                        const icon = params.subData ? params.subData.icon : '🤖';
+                        const desc = params.subData ? params.subData.description : '';
+                        ps.phoneRedditJoinedSubs.push({ name: sub, icon: icon, description: desc });
+                    }
                     savePhoneState();
                     _renderRedditApp('sub', params, screen);
                 };
@@ -1570,8 +1574,8 @@ function _bindRedditUserLinks(screen) {
 }
 
 function _renderRedditSubList(screen, subs, tabsHtml = '') {
-    const html = subs.map(s => `
-<div class="rpg-phone-reddit-sub" data-sub="${_escHtml(s.name)}">
+    const html = subs.map((s, i) => `
+<div class="rpg-phone-reddit-sub" data-idx="${i}">
   <div class="rpg-phone-reddit-sub-icon">${s.icon || '🤖'}</div>
   <div>
     <div class="rpg-phone-reddit-sub-name">${_escHtml(s.name)}</div>
@@ -1580,7 +1584,10 @@ function _renderRedditSubList(screen, subs, tabsHtml = '') {
 </div>`).join('');
     screen.innerHTML = `${tabsHtml}<div class="rpg-phone-reddit-header"><span class="rpg-phone-reddit-logo">reddit</span><span>Discover</span></div>${html}`;
     screen.querySelectorAll('.rpg-phone-reddit-sub').forEach(el => {
-        el.addEventListener('click', () => _navigateTo('reddit', 'sub', { sub: el.dataset.sub }));
+        el.addEventListener('click', () => {
+            const idx = parseInt(el.dataset.idx, 10);
+            _navigateTo('reddit', 'sub', { sub: subs[idx].name, subData: subs[idx] });
+        });
     });
 }
 
