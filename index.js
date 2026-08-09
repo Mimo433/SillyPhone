@@ -2693,9 +2693,9 @@ function _renderPhoneSettingsApp(pageId, params, screen) {
     <span style="flex:1">Image Gen Slash Command<br><small style="color:rgba(255,255,255,0.5)">Use {{prompt}} for prompt insertion</small></span>
     <input type="text" id="rpg_phone_img_cmd" class="rpg-phone-input-small" style="width:140px;" value="${_escHtml(s.imageGenCommand || '/imagine quiet=true "{{prompt}}"')}"/>
   </label>
-  <label class="rpg-phone-settings-row">
+  <label class="rpg-phone-settings-row" style="flex-direction:column; align-items:stretch; gap:4px;">
     <span style="flex:1">AI Image Prompt Instructions<br><small style="color:rgba(255,255,255,0.5)">How AI should write the image prompt</small></span>
-    <input type="text" id="rpg_phone_img_inst" class="rpg-phone-input-small" style="width:140px;" value="${_escHtml(s.imagePromptInstruction || 'detailed visual description of the photo if applicable, else empty string')}"/>
+    <textarea id="rpg_phone_img_inst" rows="3" class="rpg-phone-input-small" style="width:100%;resize:vertical;background:var(--SmartThemeDarkerColor, #121212);color:var(--SmartThemeBodyColor, #fff);">${_escHtml(s.imagePromptInstruction || 'detailed visual description of the photo if applicable, else empty string')}</textarea>
   </label>
   <label class="rpg-phone-settings-row">
     <span>Context depth (events in AI context)</span>
@@ -2742,46 +2742,67 @@ function _renderPhoneSettingsApp(pageId, params, screen) {
 function _buildSettingsHTML() {
     const s = getSettings();
     return `
-<div id="sillyphone_settings">
-  <h4>SillyPhone</h4>
-  <div class="sillyphone-setting-row">
-    <label><input type="checkbox" id="sp_enabled_cb" ${s.enabled ? 'checked' : ''}/> Enable SillyPhone</label>
+<div id="sillyphone_settings" class="inline-drawer">
+  <div class="inline-drawer-toggle inline-drawer-header" id="sp_drawer_toggle">
+    <b>📱 SillyPhone Settings</b>
+    <div class="inline-drawer-icon fa-solid fa-chevron-down down" id="sp_drawer_icon"></div>
   </div>
-  <div class="sillyphone-setting-row">
-    <label><input type="checkbox" id="sp_card_ctx_cb" ${s.includeCardContext !== false ? 'checked' : ''}/> Include Active Card Context in AI prompts</label>
-  </div>
-  <div class="sillyphone-setting-row">
-    <label><input type="checkbox" id="sp_multihog_cb" ${s.multihogMode ? 'checked' : ''}/> Enable Multihog Mode (Read Multihog PC data)</label>
-  </div>
-  <div class="sillyphone-setting-row">
-    <label><input type="checkbox" id="sp_autoputdown_cb" ${s.autoPutDownMessage !== false ? 'checked' : ''}/> Auto-send "Put down phone" message to chat</label>
-  </div>
-  <div class="sillyphone-setting-row">
-    <label><input type="checkbox" id="sp_putdown_textbox_cb" ${s.putDownMessageToTextbox ? 'checked' : ''}/> Place "Put down" message in textbox instead of sending</label>
-  </div>
-  <h4>Image Generation</h4>
-  <div class="sillyphone-setting-row">
-    <label style="flex:1" title="Use {{prompt}} to inject the visual description">Slash Command</label>
-    <input type="text" id="sp_img_cmd" style="flex:2;background:var(--SmartThemeDarkerColor);color:var(--SmartThemeBodyColor);border:1px solid var(--SmartThemeBorderColor);border-radius:4px;padding:2px 4px;" value="${_escHtml(s.imageGenCommand || '/imagine quiet=true "{{prompt}}"')}"/>
-  </div>
-  <div class="sillyphone-setting-row">
-    <label style="flex:1" title="Instructions given to the AI on how to write the image prompt">AI Instruction</label>
-    <input type="text" id="sp_img_inst" style="flex:2;background:var(--SmartThemeDarkerColor);color:var(--SmartThemeBodyColor);border:1px solid var(--SmartThemeBorderColor);border-radius:4px;padding:2px 4px;" value="${_escHtml(s.imagePromptInstruction || 'detailed visual description of the photo if applicable, else empty string')}"/>
-  </div>
-  <h4>Context & NPC</h4>
-  <div class="sillyphone-setting-row">
-    <label style="flex:1">Context Depth</label>
-    <input type="range" id="sp_ctx_depth" min="1" max="100" value="${s.contextDepth || 20}"/>
-    <span id="sp_ctx_depth_label">${s.contextDepth || 20}</span>
-  </div>
-  <div class="sillyphone-setting-row">
-    <label style="flex:1">NPC Contact Chance %</label>
-    <input type="range" id="sp_npc_chance" min="0" max="40" value="${s.npcContactChance ?? 8}"/>
-    <span id="sp_npc_chance_label">${s.npcContactChance ?? 8}%</span>
-  </div>
-  <h4>Data</h4>
-  <div class="sillyphone-setting-row">
-    <button class="rpg-phone-btn rpg-phone-btn-secondary" id="sp_open_btn" style="width:auto;padding:6px 16px;">📱 Open Phone</button>
+  <div class="inline-drawer-content" id="sp_drawer_content" style="display: none; padding-top: 10px;">
+    <div class="sillyphone-setting-row">
+      <label><input type="checkbox" id="sp_enabled_cb" ${s.enabled ? 'checked' : ''}/> Enable SillyPhone</label>
+    </div>
+    <div class="sillyphone-setting-row">
+      <label><input type="checkbox" id="sp_card_ctx_cb" ${s.includeCardContext !== false ? 'checked' : ''}/> Include Active Card Context in AI prompts</label>
+    </div>
+    <div class="sillyphone-setting-row">
+      <label><input type="checkbox" id="sp_multihog_cb" ${s.multihogMode ? 'checked' : ''}/> Enable Multihog Mode (Read Multihog PC data)</label>
+    </div>
+    <div class="sillyphone-setting-row">
+      <label><input type="checkbox" id="sp_autoputdown_cb" ${s.autoPutDownMessage !== false ? 'checked' : ''}/> Auto-send "Put down phone" message to chat</label>
+    </div>
+    <div class="sillyphone-setting-row">
+      <label><input type="checkbox" id="sp_putdown_textbox_cb" ${s.putDownMessageToTextbox ? 'checked' : ''}/> Place "Put down" message in textbox instead of sending</label>
+    </div>
+    
+    <div class="inline-drawer">
+      <div class="inline-drawer-toggle inline-drawer-header" id="sp_img_drawer_toggle">
+        <b>🖼️ Image Generation</b>
+        <div class="inline-drawer-icon fa-solid fa-chevron-down down" id="sp_img_drawer_icon"></div>
+      </div>
+      <div class="inline-drawer-content" id="sp_img_drawer_content" style="display: none; padding-top: 10px;">
+        <div class="sillyphone-setting-row">
+          <label style="flex:1" title="Use {{prompt}} to inject the visual description">Slash Command</label>
+          <input type="text" id="sp_img_cmd" style="flex:2;background:var(--SmartThemeDarkerColor);color:var(--SmartThemeBodyColor);border:1px solid var(--SmartThemeBorderColor);border-radius:4px;padding:2px 4px;" value="${_escHtml(s.imageGenCommand || '/imagine quiet=true "{{prompt}}"')}"/>
+        </div>
+        <div class="sillyphone-setting-row" style="flex-direction:column; align-items:stretch; gap:4px; margin-top:8px;">
+          <label title="Instructions given to the AI on how to write the image prompt">AI Instruction</label>
+          <textarea id="sp_img_inst" rows="3" style="background:var(--SmartThemeDarkerColor);color:var(--SmartThemeBodyColor);border:1px solid var(--SmartThemeBorderColor);border-radius:4px;padding:6px;resize:vertical;font-family:inherit;">${_escHtml(s.imagePromptInstruction || 'detailed visual description of the photo if applicable, else empty string')}</textarea>
+        </div>
+      </div>
+    </div>
+    
+    <div class="inline-drawer">
+      <div class="inline-drawer-toggle inline-drawer-header" id="sp_npc_drawer_toggle">
+        <b>👥 Context & NPC</b>
+        <div class="inline-drawer-icon fa-solid fa-chevron-down down" id="sp_npc_drawer_icon"></div>
+      </div>
+      <div class="inline-drawer-content" id="sp_npc_drawer_content" style="display: none; padding-top: 10px;">
+        <div class="sillyphone-setting-row">
+          <label style="flex:1">Context Depth</label>
+          <input type="range" id="sp_ctx_depth" min="1" max="100" value="${s.contextDepth || 20}"/>
+          <span id="sp_ctx_depth_label">${s.contextDepth || 20}</span>
+        </div>
+        <div class="sillyphone-setting-row">
+          <label style="flex:1">NPC Contact Chance %</label>
+          <input type="range" id="sp_npc_chance" min="0" max="40" value="${s.npcContactChance ?? 8}"/>
+          <span id="sp_npc_chance_label">${s.npcContactChance ?? 8}%</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="sillyphone-setting-row" style="margin-top:12px;">
+      <button class="rpg-phone-btn rpg-phone-btn-secondary" id="sp_open_btn" style="width:100%;padding:10px;">📱 Open Phone</button>
+    </div>
   </div>
 </div>`;
 }
@@ -2812,6 +2833,25 @@ function _bindSettingsPanel() {
     const npcLabel  = document.getElementById('sp_npc_chance_label');
     npcSlider?.addEventListener('input', () => { s.npcContactChance = parseInt(npcSlider.value, 10); if (npcLabel) npcLabel.textContent = `${npcSlider.value}%`; saveSettings(); });
     document.getElementById('sp_open_btn')?.addEventListener('click', togglePhone);
+
+    const bindDrawer = (toggleId, contentId, iconId) => {
+        const toggle = document.getElementById(toggleId);
+        const content = document.getElementById(contentId);
+        const icon = document.getElementById(iconId);
+        if (toggle && content && icon) {
+            toggle.onclick = () => {
+                const isHidden = content.style.display === 'none';
+                content.style.display = isHidden ? 'block' : 'none';
+                icon.classList.toggle('down', !isHidden);
+                icon.classList.toggle('up', isHidden);
+                icon.classList.toggle('fa-chevron-down', !isHidden);
+                icon.classList.toggle('fa-chevron-up', isHidden);
+            };
+        }
+    };
+    bindDrawer('sp_drawer_toggle', 'sp_drawer_content', 'sp_drawer_icon');
+    bindDrawer('sp_img_drawer_toggle', 'sp_img_drawer_content', 'sp_img_drawer_icon');
+    bindDrawer('sp_npc_drawer_toggle', 'sp_npc_drawer_content', 'sp_npc_drawer_icon');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
