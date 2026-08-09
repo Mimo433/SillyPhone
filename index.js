@@ -1537,8 +1537,14 @@ ${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">Y
 
         const s = getSettings();
         const sceneCtx = _buildSceneContext(1000);
-        const sys = `You generate realistic Reddit posts for the community ${sub} in this story world. IMPORTANT: These posts are written by strangers on the internet. They should NOT be about the player character, their close friends, or the immediate chat context. Make them general, random, and worldly. Reply ONLY valid JSON array.`;
-        const usr = `${sceneCtx}\n\n${subCtx}\nGenerate 6 Reddit posts for ${sub}. Format: [{"title":"","flair":"","author":"u/name","upvotes":0,"comments":0,"preview":"short preview text","imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>"}]`;
+        const sys = `You generate realistic Reddit posts for the community ${sub} in this story world. Reply ONLY valid JSON array.`;
+        const usr = `${sceneCtx}\n\n${subCtx}
+CRITICAL INSTRUCTION:
+Determine if the subreddit '${sub}' is directly related to the specific events or topics in the chat context above.
+- If YES: You may include posts related to those topics.
+- If NO (e.g. it's a generic sub like r/news, r/gaming, r/aww): The posts MUST be completely unrelated to the chat context. They should be random, worldly posts by strangers on the internet.
+
+Generate 6 Reddit posts for ${sub}. Format: [{"title":"","flair":"","author":"u/name","upvotes":0,"comments":0,"preview":"short preview text","imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>"}]`;
         try {
             const raw   = await sendPhoneRequest(sys, usr);
             const match  = raw.match(/\[[\s\S]*\]/);
@@ -1564,8 +1570,18 @@ ${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">Y
 
         const s = getSettings();
         const sceneCtx = _buildSceneContext(1000);
-        const sys = `You write the body text and comments for a Reddit post in this story world. IMPORTANT: The author and commenters are strangers on the internet. Do NOT mention the player character or their friends. Keep it realistic to a general internet forum. Reply ONLY valid JSON.`;
-        const usr = `${sceneCtx}\n\nWrite the body and top comments for this Reddit post in ${params.sub}:\nTitle: "${post.title}"\nFlair: ${post.flair || ''}\nPreview: ${post.preview || ''}\n\nReply ONLY with: {"body":"full post body text","imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>","comments":[{"author":"u/name","upvotes":0,"text":"comment text","replies":[{"author":"u/name","upvotes":0,"text":"reply"}]}]}`;
+        const sys = `You write the body text and comments for a Reddit post in this story world. Reply ONLY valid JSON.`;
+        const usr = `${sceneCtx}\n\nCRITICAL INSTRUCTION:
+Determine if the subreddit '${params.sub}' and the post title "${post.title}" are directly related to the specific events or topics in the chat context above.
+- If YES: The post body and comments can relate to the chat context.
+- If NO: The post body and comments MUST be completely unrelated to the characters or their immediate situation. Keep it realistic to a general internet forum written by strangers.
+
+Write the body and top comments for this Reddit post in ${params.sub}:
+Title: "${post.title}"
+Flair: ${post.flair || ''}
+Preview: ${post.preview || ''}
+
+Reply ONLY with: {"body":"full post body text","imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>","comments":[{"author":"u/name","upvotes":0,"text":"comment text","replies":[{"author":"u/name","upvotes":0,"text":"reply"}]}]}`;
         try {
             const raw   = await sendPhoneRequest(sys, usr);
             const match  = raw.match(/\{[\s\S]*\}/);
