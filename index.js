@@ -952,8 +952,64 @@ function _parsePhoneImages(text) {
     return text.replace(/\[IMAGE:\s*(.*?)\]/gi, (match, desc) => {
         const cleanDesc = desc.trim();
         return `<div class="rpg-phone-image-placeholder" data-img-prompt="${_escHtml(cleanDesc)}" role="button" tabindex="0">
+            <div class="rpg-phone-image-prompt" style="font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:8px;font-style:italic;">"${_escHtml(cleanDesc)}"</div>
             <span>🖼️ Click to generate image</span>
         </div>`;
+    });
+}
+
+function _showPhoneImagePopup(desc, onResult) {
+    const s = getSettings();
+    const overlay = document.createElement('div');
+    overlay.className = 'rpg-phone-popup-overlay';
+    overlay.innerHTML = `
+        <div class="rpg-phone-popup" style="font-family: system-ui, -apple-system, sans-serif;">
+            <h4 style="margin:0 0 8px 0;font-size:16px;">Image Generation</h4>
+            <p style="font-size:12px;margin:0 0 12px 0;color:rgba(255,255,255,0.7);">Edit the prompt before generating, or upload an image.</p>
+            <textarea id="rph_img_popup_prompt" rows="4" style="width:100%;margin-bottom:12px;background:var(--SmartThemeDarkerColor, #121212);color:var(--SmartThemeBodyColor, #fff);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:8px;box-sizing:border-box;">${_escHtml(desc)}</textarea>
+            
+            <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:16px;">
+                <label style="font-size:12px;color:rgba(255,255,255,0.7);">Slash Command:</label>
+                <input type="text" id="rph_img_popup_cmd" style="width:100%;background:var(--SmartThemeDarkerColor, #121212);color:var(--SmartThemeBodyColor, #fff);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:6px;box-sizing:border-box;" value="${_escHtml(s.imageGenCommand || '/imagine quiet=true "{{prompt}}"')}"/>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:8px;">
+                <button class="rpg-phone-reddit-btn primary" id="rph_img_popup_gen" style="justify-content:center;padding:8px;font-weight:bold;">✨ Generate</button>
+                <div style="position:relative;width:100%;">
+                    <button class="rpg-phone-reddit-btn" style="width:100%;justify-content:center;padding:8px;">📁 Upload Image</button>
+                    <input type="file" id="rph_img_popup_upload" accept="image/*" style="opacity:0;position:absolute;top:0;left:0;width:100%;height:100%;cursor:pointer;"/>
+                </div>
+                <button class="rpg-phone-reddit-btn" id="rph_img_popup_cancel" style="justify-content:center;padding:8px;margin-top:4px;">Cancel</button>
+            </div>
+        </div>
+    `;
+    const container = document.getElementById('sillyphone-container') || document.body;
+    container.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    document.getElementById('rph_img_popup_cancel').onclick = close;
+    
+    document.getElementById('rph_img_popup_gen').onclick = () => {
+        const finalDesc = document.getElementById('rph_img_popup_prompt').value.trim();
+        const finalCmd = document.getElementById('rph_img_popup_cmd').value.trim();
+        if (finalCmd !== s.imageGenCommand) {
+            s.imageGenCommand = finalCmd;
+            saveSettings();
+        }
+        close();
+        if (finalDesc) onResult({ type: 'generate', desc: finalDesc, cmd: finalCmd });
+    };
+
+    const uploadIn = document.getElementById('rph_img_popup_upload');
+    uploadIn.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (re) => {
+            close();
+            onResult({ type: 'upload', dataUrl: re.target.result });
+        };
+        reader.readAsDataURL(file);
     });
 }
 
@@ -967,28 +1023,36 @@ function _bindPhoneImages(screen) {
             if (el.dataset.generating === 'true') return;
             const desc = el.dataset.imgPrompt;
             if (!desc) return;
-            el.dataset.generating = 'true';
-            el.innerHTML = '<span>⏳ Generating image…</span>';
-            try {
-                const s = getSettings();
-                const ctx = getSTContext();
-                if (ctx.executeSlashCommandsWithOptions) {
-                    const escapedPrompt = desc.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-                    const cmd = (s.imageGenCommand || '/imagine quiet=true "{{prompt}}"').replace('{{prompt}}', escapedPrompt);
-                    const result = await ctx.executeSlashCommandsWithOptions(cmd);
-                    if (result?.pipe) {
-                        el.innerHTML = `<img src="${_escHtml(result.pipe)}" style="width:100%;border-radius:8px;cursor:pointer;display:block;" onclick="window.open(this.src,'_blank')" />`;
-                        el.style.cssText = 'border:none;padding:0;background:transparent;';
-                        el.dataset.generating = 'done';
-                        return;
+            
+            _showPhoneImagePopup(desc, async (result) => {
+                if (result.type === 'upload') {
+                    el.innerHTML = `<img src="${_escHtml(result.dataUrl)}" style="width:100%;border-radius:8px;cursor:pointer;display:block;" onclick="window.open(this.src,'_blank')" />`;
+                    el.style.cssText = 'border:none;padding:0;background:transparent;';
+                    el.dataset.generating = 'done';
+                } else if (result.type === 'generate') {
+                    el.dataset.generating = 'true';
+                    el.innerHTML = '<span>⏳ Generating image…</span>';
+                    try {
+                        const ctx = getSTContext();
+                        if (ctx.executeSlashCommandsWithOptions) {
+                            const escapedPrompt = result.desc.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                            const cmd = result.cmd.replace('{{prompt}}', escapedPrompt);
+                            const res = await ctx.executeSlashCommandsWithOptions(cmd);
+                            if (res?.pipe) {
+                                el.innerHTML = `<img src="${_escHtml(res.pipe)}" style="width:100%;border-radius:8px;cursor:pointer;display:block;" onclick="window.open(this.src,'_blank')" />`;
+                                el.style.cssText = 'border:none;padding:0;background:transparent;';
+                                el.dataset.generating = 'done';
+                                return;
+                            }
+                        }
+                        el.dataset.generating = '';
+                        el.innerHTML = '<span style="color:#ff6b6b">Image generation not available.</span>';
+                    } catch (err) {
+                        el.dataset.generating = '';
+                        el.innerHTML = `<span style="color:#ff6b6b">❌ ${_escHtml(err.message || String(err))}</span>`;
                     }
                 }
-                el.dataset.generating = '';
-                el.innerHTML = '<span style="color:#ff6b6b">Image generation not available. Use /imagine in chat.</span>';
-            } catch (err) {
-                el.dataset.generating = '';
-                el.innerHTML = `<span style="color:#ff6b6b">❌ ${_escHtml(err.message || String(err))}</span>`;
-            }
+            });
         });
     });
 }
