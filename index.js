@@ -1654,7 +1654,7 @@ Title: "${post.title}"
 Flair: ${post.flair || ''}
 Preview: ${post.preview || ''}
 
-Reply ONLY with: {"body":"full post body text","imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>","comments":[{"author":"u/name","upvotes":0,"text":"comment text","replies":[{"author":"u/name","upvotes":0,"text":"reply"}]}]}`;
+Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","upvotes":0,"text":"comment text","replies":[{"author":"u/name","upvotes":0,"text":"reply"}]}]}`;
         try {
             const raw   = await sendPhoneRequest(sys, usr);
             const match  = raw.match(/\{[\s\S]*\}/);
@@ -1971,7 +1971,7 @@ function _renderRedditPost(screen, post, sub, data) {
   <div class="rpg-phone-reddit-post-meta" style="margin-bottom:8px;"><span class="rpg-phone-reddit-user-link">${_escHtml(post.author || '')}</span></div>
   ${post.flair ? `<span class="rpg-phone-reddit-flair">${_escHtml(post.flair)}</span>` : ''}
   <div class="rpg-phone-reddit-post-detail-title">${_escHtml(post.title || '')}</div>
-  ${(data.imagePrompt || post.imagePrompt) ? `<div style="margin-bottom:12px;">${_parsePhoneImages(`[IMAGE: ${data.imagePrompt || post.imagePrompt}]`)}</div>` : ''}
+  ${post.imagePrompt ? `<div style="margin-bottom:12px;">${_parsePhoneImages(`[IMAGE: ${post.imagePrompt}]`)}</div>` : ''}
   <div class="rpg-phone-reddit-post-body">${_escHtml(data.body || '')}</div>
   <div class="rpg-phone-reddit-post-actions" style="display:flex; align-items:center;">
     <button class="rpg-phone-vote-btn ${vote > 0 ? 'voted-up' : ''}" id="rph_vote_up">⬆</button>
