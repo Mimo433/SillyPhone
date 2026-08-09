@@ -1350,7 +1350,8 @@ ${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">Y
         if (ps.phoneCache[cacheKey]) { renderProfile(ps.phoneCache[cacheKey]); return; }
 
         const sys = `You generate a Reddit user profile. Reply ONLY valid JSON.`;
-        const usr = `Generate a realistic profile for reddit user ${user}. Format: {"bio":"short bio","recentPosts":[{"title":"","sub":"r/name","upvotes":0,"comments":0}]}`;
+        const profileCtx = params.context ? `This user was found via this context:\n${params.context}\nMake sure their bio and recent posts align with this personality.` : '';
+        const usr = `Generate a realistic profile for reddit user ${user}. ${profileCtx}\nFormat: {"bio":"short bio","recentPosts":[{"title":"","sub":"r/name","upvotes":0,"comments":0}]}`;
         try {
             screen.innerHTML = `<div class="rpg-phone-loading"><div class="rpg-phone-spinner"></div><p>Loading Profile…</p></div>`;
             const raw = await sendPhoneRequest(sys, usr);
@@ -1448,7 +1449,18 @@ function _bindRedditUserLinks(screen) {
     screen.querySelectorAll('.rpg-phone-reddit-user-link').forEach(el => {
         el.addEventListener('click', (e) => {
             e.stopPropagation();
-            _navigateTo('reddit', 'profile', { user: el.textContent.trim() });
+            let context = '';
+            const postEl = el.closest('.rpg-phone-reddit-post, .rpg-phone-reddit-post-detail');
+            if (postEl) {
+                const title = postEl.querySelector('.rpg-phone-reddit-post-title, .rpg-phone-reddit-post-detail-title')?.textContent;
+                if (title) context += `Post Title: "${title}"\n`;
+            }
+            const commentEl = el.closest('.rpg-phone-reddit-comment');
+            if (commentEl) {
+                const text = commentEl.querySelector('.rpg-phone-reddit-comment-text')?.textContent;
+                if (text) context += `Commented: "${text}"\n`;
+            }
+            _navigateTo('reddit', 'profile', { user: el.textContent.trim(), context: context.trim() });
         });
     });
 }
