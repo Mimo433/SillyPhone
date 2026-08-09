@@ -95,6 +95,9 @@ function getPhoneState() {
     if (!cs.phoneGallery)  cs.phoneGallery   = [];
     if (!cs.phoneCache)    cs.phoneCache     = {};
     if (!cs.phoneVotes)    cs.phoneVotes     = {};
+    if (!cs.phoneRedditJoinedSubs) cs.phoneRedditJoinedSubs = [];
+    if (!cs.phoneRedditFollowing)  cs.phoneRedditFollowing  = [];
+    if (!cs.phoneRedditDMs)        cs.phoneRedditDMs        = {};
     return cs;
 }
 
@@ -1101,10 +1104,56 @@ async function _renderRedditApp(pageId, params, screen) {
     _setNavTitle('Reddit');
     const ps = getPhoneState();
 
+    const renderTabs = (activeTab) => `
+<div class="rpg-phone-reddit-tabs">
+  <button class="rpg-phone-reddit-tab ${activeTab === 'discover' ? 'active' : ''}" data-tab="discover">Discover</button>
+  <button class="rpg-phone-reddit-tab ${activeTab === 'joined' ? 'active' : ''}" data-tab="joined">Joined</button>
+  <button class="rpg-phone-reddit-tab ${activeTab === 'following' ? 'active' : ''}" data-tab="following">Following</button>
+  <button class="rpg-phone-reddit-tab ${activeTab === 'dms' ? 'active' : ''}" data-tab="dms">Chats</button>
+</div>`;
+
+    const bindTabs = () => {
+        screen.querySelectorAll('.rpg-phone-reddit-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                if (tab === 'discover') _navigateTo('reddit', 'home');
+                else if (tab === 'joined') _navigateTo('reddit', 'joined_subs');
+                else if (tab === 'following') _navigateTo('reddit', 'following');
+                else if (tab === 'dms') _navigateTo('reddit', 'dm_list');
+            });
+        });
+    };
+
     if (pageId === 'home' || !pageId) {
         _logPhoneActivity('reddit', 'Reddit', 'out', 'Opened Reddit');
         const cacheKey = 'reddit_subs';
-        if (ps.phoneCache[cacheKey]) { _renderRedditSubList(screen, ps.phoneCache[cacheKey]); return; }
+
+        const renderHome = (subs) => {
+            _renderRedditSubList(screen, subs, renderTabs('discover'));
+            bindTabs();
+            const header = screen.querySelector('.rpg-phone-reddit-header');
+            if (header) {
+                const searchHtml = `
+                <div class="rpg-phone-reddit-search">
+                  <input type="text" class="rpg-phone-input-small" id="rph_reddit_search_input" placeholder="Search community (e.g. r/news)..." style="flex:1" autocomplete="off"/>
+                  <button class="rpg-phone-reddit-btn primary" id="rph_reddit_search_btn">Go</button>
+                </div>`;
+                header.insertAdjacentHTML('afterend', searchHtml);
+                const go = () => {
+                    const q = document.getElementById('rph_reddit_search_input')?.value.trim();
+                    if (q) _navigateTo('reddit', 'sub', { sub: q.startsWith('r/') ? q : 'r/' + q.replace(/\s+/g, '') });
+                };
+                document.getElementById('rph_reddit_search_btn')?.addEventListener('click', go);
+                document.getElementById('rph_reddit_search_input')?.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+            }
+        };
+
+        if (ps.phoneCache[cacheKey]) {
+            renderHome(ps.phoneCache[cacheKey]);
+            _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('home', params, screen); });
+            return;
+        }
+
         const sceneCtx = _buildSceneContext(1000);
         const sys = `You generate a list of reddit-like communities fitting this story world. The internet is vast — create GENERAL interest communities, NOT things specifically about the player character or their friends. Reply ONLY valid JSON array.`;
         const usr = `${sceneCtx}\n\nGenerate 6 relevant subreddits for this world. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
@@ -1113,9 +1162,76 @@ async function _renderRedditApp(pageId, params, screen) {
             const match = raw.match(/\[[\s\S]*\]/);
             const subs  = match ? JSON.parse(match[0]) : [];
             ps.phoneCache[cacheKey] = subs; savePhoneState();
-            _renderRedditSubList(screen, subs);
+            renderHome(subs);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('home', params, screen); });
-        } catch (e) { screen.innerHTML = `<div class="rpg-phone-error">Reddit unavailable: ${_escHtml(e.message)}</div>`; }
+        } catch (e) { screen.innerHTML = `${renderTabs('discover')}<div class="rpg-phone-error">Reddit unavailable: ${_escHtml(e.message)}</div>`; bindTabs(); }
+        return;
+    }
+
+    if (pageId === 'joined_subs') {
+        _setNavTitle('Joined');
+        const joined = ps.phoneRedditJoinedSubs || [];
+        const items = joined.map(s => `
+<div class="rpg-phone-reddit-sub" data-sub="${_escHtml(s.name)}">
+  <div class="rpg-phone-reddit-sub-icon">${s.icon || '🤖'}</div>
+  <div>
+    <div class="rpg-phone-reddit-sub-name">${_escHtml(s.name)}</div>
+    <div class="rpg-phone-reddit-sub-desc">${_escHtml(s.description || '')}</div>
+  </div>
+</div>`).join('');
+        screen.innerHTML = `
+${renderTabs('joined')}
+<div style="padding:12px;text-align:center;">
+  <button class="rpg-phone-reddit-btn primary" id="rph_create_custom_sub">+ Create Custom Sub</button>
+</div>
+${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">You haven\'t joined any communities.</p>'}
+`;
+        bindTabs();
+        document.getElementById('rph_create_custom_sub')?.addEventListener('click', () => _navigateTo('reddit', 'create_sub'));
+        screen.querySelectorAll('.rpg-phone-reddit-sub').forEach(el => {
+            el.addEventListener('click', () => _navigateTo('reddit', 'sub', { sub: el.dataset.sub }));
+        });
+        return;
+    }
+
+    if (pageId === 'create_sub') {
+        _setNavTitle('Create Subreddit');
+        screen.innerHTML = `
+<div style="padding:16px;">
+  <h3>Create Custom Subreddit</h3>
+  <input type="text" class="rpg-phone-input-small" id="rph_sub_name" placeholder="Name (e.g. r/localnews)..." style="margin-bottom:12px;" autocomplete="off"/>
+  <input type="text" class="rpg-phone-input-small" id="rph_sub_icon" placeholder="Icon (emoji)..." style="margin-bottom:12px;" autocomplete="off"/>
+  <textarea class="rpg-phone-textarea" id="rph_sub_desc" placeholder="Describe what this community is about..."></textarea>
+  <button class="rpg-phone-reddit-btn primary" id="rph_save_sub" style="margin-top:12px;width:100%;">Create Community</button>
+</div>
+`;
+        document.getElementById('rph_save_sub')?.addEventListener('click', () => {
+            let name = document.getElementById('rph_sub_name')?.value.trim() || '';
+            const icon = document.getElementById('rph_sub_icon')?.value.trim() || '🤖';
+            const desc = document.getElementById('rph_sub_desc')?.value.trim() || '';
+            if (!name) return;
+            if (!name.startsWith('r/')) name = 'r/' + name;
+            name = name.replace(/\s+/g, '');
+            ps.phoneRedditJoinedSubs.push({ name, icon, description: desc });
+            savePhoneState();
+            _navigateTo('reddit', 'sub', { sub: name });
+        });
+        return;
+    }
+
+    if (pageId === 'following') {
+        _setNavTitle('Following');
+        const users = ps.phoneRedditFollowing || [];
+        const items = users.map(u => `
+<div class="rpg-phone-reddit-sub" data-user="${_escHtml(u)}">
+  <div class="rpg-phone-reddit-profile-avatar" style="width:40px;height:40px;font-size:18px;margin:0;">${u.replace('u/','')[0]?.toUpperCase()}</div>
+  <div class="rpg-phone-reddit-sub-name">${_escHtml(u)}</div>
+</div>`).join('');
+        screen.innerHTML = `${renderTabs('following')}${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">You aren\'t following anyone.</p>'}`;
+        bindTabs();
+        screen.querySelectorAll('.rpg-phone-reddit-sub').forEach(el => {
+            el.addEventListener('click', () => _navigateTo('reddit', 'profile', { user: el.dataset.user }));
+        });
         return;
     }
 
@@ -1123,17 +1239,47 @@ async function _renderRedditApp(pageId, params, screen) {
         const sub = params.sub || 'r/all';
         _setNavTitle(sub);
         _logPhoneActivity('reddit', sub, 'out', `Browsing ${sub}`);
+
+        const renderSub = (posts) => {
+            _renderRedditFeed(screen, sub, posts);
+            const joined = ps.phoneRedditJoinedSubs.find(s => s.name === sub);
+            const header = screen.querySelector('.rpg-phone-reddit-sub-header');
+            if (header) {
+                header.style.display = 'flex';
+                header.style.justifyContent = 'space-between';
+                header.style.alignItems = 'center';
+                const btn = document.createElement('button');
+                btn.className = `rpg-phone-reddit-btn ${joined ? '' : 'primary'}`;
+                btn.textContent = joined ? 'Joined' : 'Join';
+                btn.onclick = () => {
+                    if (joined) ps.phoneRedditJoinedSubs = ps.phoneRedditJoinedSubs.filter(s => s.name !== sub);
+                    else ps.phoneRedditJoinedSubs.push({ name: sub, icon: '🤖', description: '' });
+                    savePhoneState();
+                    _renderRedditApp('sub', params, screen);
+                };
+                header.appendChild(btn);
+            }
+        };
+
         const cacheKey = `reddit_feed_${sub}`;
-        if (ps.phoneCache[cacheKey]) { _renderRedditFeed(screen, sub, ps.phoneCache[cacheKey]); return; }
+        if (ps.phoneCache[cacheKey]) {
+            renderSub(ps.phoneCache[cacheKey]);
+            _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('sub', params, screen); });
+            return;
+        }
+
+        const customSub = ps.phoneRedditJoinedSubs.find(s => s.name === sub);
+        const subCtx = customSub && customSub.description ? `This community is about: ${customSub.description}` : '';
+
         const sceneCtx = _buildSceneContext(1000);
         const sys = `You generate realistic Reddit posts for the community ${sub} in this story world. IMPORTANT: These posts are written by strangers on the internet. They should NOT be about the player character, their close friends, or the immediate chat context. Make them general, random, and worldly. Reply ONLY valid JSON array.`;
-        const usr = `${sceneCtx}\n\nGenerate 6 Reddit posts for ${sub}. Format: [{"title":"","flair":"","author":"u/name","upvotes":0,"comments":0,"preview":"short preview text"}]`;
+        const usr = `${sceneCtx}\n\n${subCtx}\nGenerate 6 Reddit posts for ${sub}. Format: [{"title":"","flair":"","author":"u/name","upvotes":0,"comments":0,"preview":"short preview text"}]`;
         try {
             const raw   = await sendPhoneRequest(sys, usr);
             const match  = raw.match(/\[[\s\S]*\]/);
             const posts  = match ? JSON.parse(match[0]) : [];
             ps.phoneCache[cacheKey] = posts; savePhoneState();
-            _renderRedditFeed(screen, sub, posts);
+            renderSub(posts);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('sub', params, screen); });
         } catch (e) { screen.innerHTML = `<div class="rpg-phone-error">Feed failed: ${_escHtml(e.message)}</div>`; }
         return;
@@ -1145,7 +1291,11 @@ async function _renderRedditApp(pageId, params, screen) {
         _logPhoneActivity('reddit', params.sub || 'Reddit', 'in', `Read post: "${_summarizeText(post.title, 60)}"`);
 
         const cacheKey = `reddit_post_${params.sub}_${encodeURIComponent(post.title || '')}`;
-        if (ps.phoneCache[cacheKey]) { _renderRedditPost(screen, post, params.sub, ps.phoneCache[cacheKey]); return; }
+        if (ps.phoneCache[cacheKey]) {
+            _renderRedditPost(screen, post, params.sub, ps.phoneCache[cacheKey]);
+            _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('post', params, screen); });
+            return;
+        }
 
         const sceneCtx = _buildSceneContext(1000);
         const sys = `You write the body text and comments for a Reddit post in this story world. IMPORTANT: The author and commenters are strangers on the internet. Do NOT mention the player character or their friends. Keep it realistic to a general internet forum. Reply ONLY valid JSON.`;
@@ -1158,10 +1308,152 @@ async function _renderRedditApp(pageId, params, screen) {
             _renderRedditPost(screen, post, params.sub, data);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('post', params, screen); });
         } catch (e) { screen.innerHTML = `<div class="rpg-phone-error">Post failed: ${_escHtml(e.message)}</div>`; }
+        return;
+    }
+
+    if (pageId === 'profile') {
+        const user = params.user;
+        _setNavTitle(user);
+        const cacheKey = `reddit_user_${user}`;
+        
+        const renderProfile = (data) => {
+            const isFollowing = ps.phoneRedditFollowing.includes(user);
+            const postsHtml = (data.recentPosts || []).map(p => `
+<div class="rpg-phone-reddit-post" style="border:1px solid rgba(255,255,255,0.1);margin:8px 16px;border-radius:8px;">
+  <div class="rpg-phone-reddit-post-meta">${_escHtml(p.sub || 'r/all')}</div>
+  <div class="rpg-phone-reddit-post-title">${_escHtml(p.title || '')}</div>
+  <div class="rpg-phone-reddit-post-meta">⬆ ${p.upvotes || 0} · 💬 ${p.comments || 0}</div>
+</div>`).join('');
+
+            screen.innerHTML = `
+<div class="rpg-phone-reddit-profile-header">
+  <div class="rpg-phone-reddit-profile-avatar">${user.replace('u/','')[0]?.toUpperCase() || 'U'}</div>
+  <div class="rpg-phone-reddit-profile-name">${_escHtml(user)}</div>
+  <div class="rpg-phone-reddit-profile-bio">${_escHtml(data.bio || '')}</div>
+  <div style="display:flex;gap:8px;justify-content:center;">
+    <button class="rpg-phone-reddit-btn ${isFollowing ? '' : 'primary'}" id="rph_follow_user">${isFollowing ? 'Following' : 'Follow'}</button>
+    <button class="rpg-phone-reddit-btn" id="rph_dm_user">Message</button>
+  </div>
+</div>
+<div>${postsHtml}</div>`;
+            document.getElementById('rph_follow_user')?.addEventListener('click', () => {
+                if (isFollowing) ps.phoneRedditFollowing = ps.phoneRedditFollowing.filter(u => u !== user);
+                else ps.phoneRedditFollowing.push(user);
+                savePhoneState();
+                _renderRedditApp('profile', params, screen);
+            });
+            document.getElementById('rph_dm_user')?.addEventListener('click', () => {
+                _navigateTo('reddit', 'dm_thread', { user });
+            });
+        };
+
+        if (ps.phoneCache[cacheKey]) { renderProfile(ps.phoneCache[cacheKey]); return; }
+
+        const sys = `You generate a Reddit user profile. Reply ONLY valid JSON.`;
+        const usr = `Generate a realistic profile for reddit user ${user}. Format: {"bio":"short bio","recentPosts":[{"title":"","sub":"r/name","upvotes":0,"comments":0}]}`;
+        try {
+            screen.innerHTML = `<div class="rpg-phone-loading"><div class="rpg-phone-spinner"></div><p>Loading Profile…</p></div>`;
+            const raw = await sendPhoneRequest(sys, usr);
+            const match = raw.match(/\{[\s\S]*\}/);
+            const data = match ? JSON.parse(match[0]) : { bio: '', recentPosts: [] };
+            ps.phoneCache[cacheKey] = data; savePhoneState();
+            renderProfile(data);
+        } catch (e) { screen.innerHTML = `<div class="rpg-phone-error">Profile failed: ${_escHtml(e.message)}</div>`; }
+        return;
+    }
+
+    if (pageId === 'dm_list') {
+        _setNavTitle('Chats');
+        const dms = Object.entries(ps.phoneRedditDMs || {}).filter(([, msgs]) => msgs.length > 0);
+        const rows = dms.map(([user, msgs]) => `
+<div class="rpg-phone-reddit-dm-row" data-user="${_escHtml(user)}">
+  <div class="rpg-phone-reddit-dm-avatar">${user.replace('u/','')[0]?.toUpperCase() || 'U'}</div>
+  <div style="flex:1">
+    <div style="font-weight:700;">${_escHtml(user)}</div>
+    <div style="font-size:12px;color:rgba(255,255,255,0.6);">${_escHtml(_summarizeText(msgs[msgs.length - 1].text, 40))}</div>
+  </div>
+</div>`).join('');
+        screen.innerHTML = `${renderTabs('dms')}<div class="rpg-phone-reddit-dm-list">${rows || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">No active chats.</p>'}</div>`;
+        bindTabs();
+        screen.querySelectorAll('.rpg-phone-reddit-dm-row').forEach(el => {
+            el.addEventListener('click', () => _navigateTo('reddit', 'dm_thread', { user: el.dataset.user }));
+        });
+        return;
+    }
+
+    if (pageId === 'dm_thread') {
+        const user = params.user;
+        _setNavTitle(user);
+        const msgs = ps.phoneRedditDMs[user] || [];
+        const bubblesHTML = msgs.map(m => `
+<div class="rpg-phone-sms-bubble ${m.direction === 'out' ? 'rpg-phone-sms-out' : 'rpg-phone-sms-in'}">
+  ${_escHtml(m.text || '')}
+</div>`).join('');
+
+        screen.innerHTML = `
+<div class="rpg-phone-sms-thread">
+  <div class="rpg-phone-sms-bubbles" id="rph_dm_bubbles">
+    ${bubblesHTML || `<p class="rpg-phone-muted" style="text-align:center;padding:20px;">Chat with ${user}</p>`}
+  </div>
+  <div class="rpg-phone-sms-compose">
+    <input type="text" class="rpg-phone-sms-input" id="rph_dm_input" placeholder="Message…" autocomplete="off"/>
+    <button class="rpg-phone-sms-send-btn" id="rph_dm_send">▶</button>
+  </div>
+</div>`;
+        const bubbles = document.getElementById('rph_dm_bubbles');
+        if (bubbles) bubbles.scrollTop = bubbles.scrollHeight;
+
+        const sendMsg = async () => {
+            const input = document.getElementById('rph_dm_input');
+            const text = input?.value.trim();
+            if (!text) return;
+            input.value = '';
+            
+            const outBubble = document.createElement('div');
+            outBubble.className = 'rpg-phone-sms-bubble rpg-phone-sms-out';
+            outBubble.textContent = text;
+            bubbles.appendChild(outBubble);
+            bubbles.scrollTop = bubbles.scrollHeight;
+
+            if (!ps.phoneRedditDMs[user]) ps.phoneRedditDMs[user] = [];
+            ps.phoneRedditDMs[user].push({ text, direction: 'out' });
+            savePhoneState();
+
+            try {
+                const { pcName } = _getPlayerCharacterInfo();
+                const myName = `u/${(pcName || 'Player').toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+                const history = ps.phoneRedditDMs[user].map(m => `${m.direction === 'out' ? myName : user}: ${m.text}`).join('\n');
+                const sceneCtx = _buildSceneContext(1000);
+                const sys = `You are roleplaying as Reddit user ${user} in a private DM chat. You are a stranger on the internet. Keep it realistic to Reddit chat culture. Reply ONLY with your message text.`;
+                const usr = `${sceneCtx}\n\nChat History:\n${history}\n\n${user} replies:`;
+                const reply = (await sendPhoneRequest(sys, usr)).trim();
+
+                ps.phoneRedditDMs[user].push({ text: reply, direction: 'in' });
+                savePhoneState();
+                
+                const inBubble = document.createElement('div');
+                inBubble.className = 'rpg-phone-sms-bubble rpg-phone-sms-in';
+                inBubble.textContent = reply;
+                bubbles.appendChild(inBubble);
+                bubbles.scrollTop = bubbles.scrollHeight;
+            } catch (e) {}
+        };
+        document.getElementById('rph_dm_send')?.addEventListener('click', sendMsg);
+        document.getElementById('rph_dm_input')?.addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
+        return;
     }
 }
 
-function _renderRedditSubList(screen, subs) {
+function _bindRedditUserLinks(screen) {
+    screen.querySelectorAll('.rpg-phone-reddit-user-link').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            _navigateTo('reddit', 'profile', { user: el.textContent.trim() });
+        });
+    });
+}
+
+function _renderRedditSubList(screen, subs, tabsHtml = '') {
     const html = subs.map(s => `
 <div class="rpg-phone-reddit-sub" data-sub="${_escHtml(s.name)}">
   <div class="rpg-phone-reddit-sub-icon">${s.icon || '🤖'}</div>
@@ -1170,7 +1462,7 @@ function _renderRedditSubList(screen, subs) {
     <div class="rpg-phone-reddit-sub-desc">${_escHtml(s.description || '')}</div>
   </div>
 </div>`).join('');
-    screen.innerHTML = `<div class="rpg-phone-reddit-header"><span class="rpg-phone-reddit-logo">reddit</span><span>Communities</span></div>${html}`;
+    screen.innerHTML = `${tabsHtml}<div class="rpg-phone-reddit-header"><span class="rpg-phone-reddit-logo">reddit</span><span>Discover</span></div>${html}`;
     screen.querySelectorAll('.rpg-phone-reddit-sub').forEach(el => {
         el.addEventListener('click', () => _navigateTo('reddit', 'sub', { sub: el.dataset.sub }));
     });
@@ -1184,11 +1476,12 @@ function _renderRedditFeed(screen, sub, posts) {
   <div class="rpg-phone-reddit-post-meta">
     <span>⬆ ${p.upvotes || 0}</span>
     <span>💬 ${p.comments || 0}</span>
-    <span>${_escHtml(p.author || '')}</span>
+    <span class="rpg-phone-reddit-user-link">${_escHtml(p.author || '')}</span>
   </div>
   ${p.preview ? `<div class="rpg-phone-reddit-post-preview">${_escHtml(p.preview)}</div>` : ''}
 </div>`).join('');
     screen.innerHTML = `<div class="rpg-phone-reddit-sub-header">${_escHtml(sub)}</div>${postsHTML}`;
+    _bindRedditUserLinks(screen);
     screen.querySelectorAll('.rpg-phone-reddit-post').forEach(el => {
         el.addEventListener('click', () => {
             const idx = parseInt(el.dataset.idx, 10);
@@ -1202,25 +1495,35 @@ function _renderRedditPost(screen, post, sub, data) {
     const ps = getPhoneState();
     const voteKey = `${sub}_${encodeURIComponent(post.title || '')}`;
     const vote = ps.phoneVotes[voteKey] || 0;
+    const { pcName } = _getPlayerCharacterInfo();
+    const myUsername = `u/${(pcName || 'Player').toLowerCase().replace(/[^a-z0-9]/g, '')}`;
 
-    const commentsHTML = (data.comments || []).map(c => {
-        const repliesHTML = (c.replies || []).map(r => `
-<div class="rpg-phone-reddit-reply">
-  <span class="rpg-phone-reddit-comment-author">${_escHtml(r.author || '')}</span>
-  <span class="rpg-phone-reddit-comment-up">⬆ ${r.upvotes || 0}</span>
-  <div class="rpg-phone-reddit-comment-text">${_escHtml(r.text || '')}</div>
-</div>`).join('');
-        return `
+    const renderComments = (commentsArr, parentPath = '') => {
+        return (commentsArr || []).map((c, i) => {
+            const currentPath = parentPath ? `${parentPath},${i}` : `${i}`;
+            const repliesHTML = c.replies && c.replies.length ? renderComments(c.replies, currentPath) : '';
+            return `
 <div class="rpg-phone-reddit-comment">
-  <span class="rpg-phone-reddit-comment-author">${_escHtml(c.author || '')}</span>
+  <span class="rpg-phone-reddit-user-link rpg-phone-reddit-comment-author">${_escHtml(c.author || '')}</span>
   <span class="rpg-phone-reddit-comment-up">⬆ ${c.upvotes || 0}</span>
   <div class="rpg-phone-reddit-comment-text">${_escHtml(c.text || '')}</div>
-  ${repliesHTML}
+  <div class="rpg-phone-reddit-comment-actions">
+    <button class="rpg-phone-reddit-reply-btn" data-reply-path="${currentPath}">Reply</button>
+  </div>
+  <div class="rpg-phone-reddit-input-box" id="rph_reply_box_${currentPath}" style="display:none;">
+    <input type="text" class="rpg-phone-input-small" placeholder="Add a reply..." style="flex:1" autocomplete="off"/>
+    <button class="rpg-phone-reddit-btn primary" data-send-reply="${currentPath}">Post</button>
+  </div>
+  ${repliesHTML ? `<div class="rpg-phone-reddit-reply">${repliesHTML}</div>` : ''}
 </div>`;
-    }).join('');
+        }).join('');
+    };
+
+    const commentsHTML = renderComments(data.comments);
 
     screen.innerHTML = `
 <div class="rpg-phone-reddit-post-detail">
+  <div class="rpg-phone-reddit-post-meta" style="margin-bottom:8px;"><span class="rpg-phone-reddit-user-link">${_escHtml(post.author || '')}</span></div>
   ${post.flair ? `<span class="rpg-phone-reddit-flair">${_escHtml(post.flair)}</span>` : ''}
   <div class="rpg-phone-reddit-post-detail-title">${_escHtml(post.title || '')}</div>
   <div class="rpg-phone-reddit-post-body">${_escHtml(data.body || '')}</div>
@@ -1232,9 +1535,15 @@ function _renderRedditPost(screen, post, sub, data) {
   </div>
   <div class="rpg-phone-reddit-comments-section">
     <h4>Comments</h4>
+    <div class="rpg-phone-reddit-input-box" style="margin-bottom:16px;">
+      <input type="text" class="rpg-phone-input-small" id="rph_main_comment_input" placeholder="Add a comment..." style="flex:1" autocomplete="off"/>
+      <button class="rpg-phone-reddit-btn primary" id="rph_main_comment_btn">Post</button>
+    </div>
     ${commentsHTML || '<p class="rpg-phone-muted" style="padding:8px 0">No comments yet.</p>'}
   </div>
 </div>`;
+
+    _bindRedditUserLinks(screen);
 
     const scoreEl = screen.querySelector('#rph_vote_score');
     const upBtn   = screen.querySelector('#rph_vote_up');
@@ -1251,6 +1560,71 @@ function _renderRedditPost(screen, post, sub, data) {
     };
     upBtn?.addEventListener('click', () => updateVote(1));
     dnBtn?.addEventListener('click', () => updateVote(-1));
+
+    // Handle Commenting / Replying
+    const addCommentToData = async (text, pathStr) => {
+        if (!text) return;
+        let targetArr = data.comments;
+        if (pathStr) {
+            const indices = pathStr.split(',').map(Number);
+            let current = { replies: data.comments };
+            for (const idx of indices) {
+                current = current.replies[idx];
+                if (!current.replies) current.replies = [];
+            }
+            targetArr = current.replies;
+        }
+        
+        targetArr.push({ author: myUsername, upvotes: 1, text, replies: [] });
+        
+        // Cache update
+        const cacheKey = `reddit_post_${sub}_${encodeURIComponent(post.title || '')}`;
+        ps.phoneCache[cacheKey] = data;
+        savePhoneState();
+        _renderRedditPost(screen, post, sub, data);
+
+        // Trigger AI to generate a reply
+        try {
+            const sceneCtx = _buildSceneContext(800);
+            const sys = `You generate a reply to a user's comment on a Reddit post in this story world. The author is a stranger. Reply ONLY valid JSON.`;
+            const usr = `${sceneCtx}\n\nPost: "${post.title}"\nUser (${myUsername}) commented: "${text}"\nGenerate 1 realistic Reddit reply to this comment from another user.\nFormat: {"author":"u/name","upvotes":0,"text":"comment text"}`;
+            const raw = await sendPhoneRequest(sys, usr);
+            const match = raw.match(/\{[\s\S]*\}/);
+            if (match) {
+                const replyData = JSON.parse(match[0]);
+                replyData.replies = [];
+                // Add the AI reply to the array we just pushed to
+                targetArr[targetArr.length - 1].replies.push(replyData);
+                ps.phoneCache[cacheKey] = data;
+                savePhoneState();
+                _renderRedditPost(screen, post, sub, data); // Re-render with AI reply
+            }
+        } catch (e) { console.warn('Reddit AI reply failed', e); }
+    };
+
+    // Bind Top-Level Comment
+    document.getElementById('rph_main_comment_btn')?.addEventListener('click', () => {
+        const input = document.getElementById('rph_main_comment_input');
+        addCommentToData(input?.value.trim(), null);
+    });
+
+    // Bind Reply Buttons
+    screen.querySelectorAll('[data-reply-path]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const box = document.getElementById(`rph_reply_box_${btn.dataset.replyPath}`);
+            if (box) box.style.display = box.style.display === 'none' ? 'flex' : 'none';
+        });
+    });
+
+    // Bind Send Reply Buttons
+    screen.querySelectorAll('[data-send-reply]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const path = btn.dataset.sendReply;
+            const box = document.getElementById(`rph_reply_box_${path}`);
+            const input = box?.querySelector('input');
+            addCommentToData(input?.value.trim(), path);
+        });
+    });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

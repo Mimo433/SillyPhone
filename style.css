@@ -191,6 +191,30 @@
 .rpg-phone-reddit-post-body { font-size: 13px; line-height: 1.6; color: rgba(255,255,255,0.8); margin-bottom: 12px; }
 .rpg-phone-reddit-post-actions { display: flex; align-items: center; gap: 4px; margin: 10px 0; font-size: 13px; color: rgba(255,255,255,0.5); }
 .rpg-phone-reddit-comments-section h4 { font-size: 13px; opacity: 0.6; margin: 12px 0 8px; }
+.rpg-phone-reddit-comment-text { font-size: 13px; line-height: 1.5; color: rgba(255,255,255,0.8); }
+.rpg-phone-reddit-reply { margin-top: 10px; padding-left: 12px; border-left: 2px solid rgba(255,255,255,0.1); }
+.rpg-phone-reddit-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); }
+.rpg-phone-reddit-tab { flex: 1; padding: 10px 0; text-align: center; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.5); cursor: pointer; border: none; background: transparent; border-bottom: 2px solid transparent; }
+.rpg-phone-reddit-tab.active { color: #ff6314; border-bottom-color: #ff6314; }
+.rpg-phone-reddit-tab:hover { background: rgba(255,255,255,0.05); }
+.rpg-phone-reddit-search { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; gap: 8px; }
+.rpg-phone-reddit-profile-header { padding: 20px 16px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.rpg-phone-reddit-profile-avatar { width: 64px; height: 64px; border-radius: 50%; background: #ff6314; color: white; display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 12px; font-weight: bold; }
+.rpg-phone-reddit-profile-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+.rpg-phone-reddit-profile-bio { font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 16px; line-height: 1.4; }
+.rpg-phone-reddit-btn { background: rgba(255,255,255,0.1); border: none; color: white; padding: 6px 12px; border-radius: 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.rpg-phone-reddit-btn.primary { background: #ff6314; }
+.rpg-phone-reddit-btn:hover { opacity: 0.9; }
+.rpg-phone-reddit-comment-actions { margin-top: 6px; font-size: 11px; }
+.rpg-phone-reddit-reply-btn { background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer; font-weight: 600; padding: 0; }
+.rpg-phone-reddit-reply-btn:hover { color: white; }
+.rpg-phone-reddit-input-box { display: flex; gap: 8px; margin-top: 8px; }
+.rpg-phone-reddit-dm-list { padding: 0; }
+.rpg-phone-reddit-dm-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; }
+.rpg-phone-reddit-dm-row:hover { background: rgba(255,255,255,0.05); }
+.rpg-phone-reddit-dm-avatar { width: 40px; height: 40px; border-radius: 50%; background: #333; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; }
+.rpg-phone-reddit-user-link { cursor: pointer; color: #ff6314; font-weight: 600; }
+.rpg-phone-reddit-user-link:hover { text-decoration: underline; }
 .rpg-phone-reddit-comment { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
 .rpg-phone-reddit-reply { padding: 8px 0 0 16px; border-left: 2px solid rgba(255,255,255,0.08); margin-left: 8px; margin-top: 6px; }
 .rpg-phone-reddit-comment-author { font-size: 11px; color: #8ab4f8; font-weight: 600; margin-right: 8px; }
