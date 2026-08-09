@@ -47,6 +47,7 @@ const DEFAULTS = {
     panelY: null,
     chatData: {},
     multihogMode: false,
+    autoPutDownMessage: true,
 };
 
 function getSettings() {
@@ -346,6 +347,8 @@ function buildPhoneContextBlock() {
         const ps = getPhoneState();
         if (!ps) return '';
 
+        let prefix = 'CRITICAL INSTRUCTION: If the narrative mentions the player put down their phone after X minutes, use the [PHONE_ACTIVITY] block below to summarize what they were just doing on it.\n';
+
         const depth = Math.max(1, s.contextDepth || 20);
         const recent = ps.phoneHistory.slice(-depth);
         if (!recent.length && ps.phoneUnread.messages === 0 && ps.phoneUnread.calls === 0) return '';
@@ -361,7 +364,7 @@ function buildPhoneContextBlock() {
         if (ps.phoneUnread.calls    > 0) unreadParts.push(`${ps.phoneUnread.calls} missed call${ps.phoneUnread.calls > 1 ? 's' : ''}`);
         const unreadNote = unreadParts.length ? `\nPending: ${unreadParts.join(', ')}` : '';
 
-        return `[PHONE_ACTIVITY]\n${lines.join('\n')}${unreadNote}\n[/PHONE_ACTIVITY]`;
+        return `${prefix}[PHONE_ACTIVITY]\n${lines.join('\n')}${unreadNote}\n[/PHONE_ACTIVITY]`;
     } catch (e) {
         console.warn('[SillyPhone] buildPhoneContextBlock failed:', e);
         return '';
@@ -612,9 +615,12 @@ function _updateNotificationBadge() {
 // Phone open / close / toggle
 // ─────────────────────────────────────────────────────────────────────────────
 
+let _phoneSessionStartTime = 0;
+
 function openPhone() {
     if (!_phoneEl) _buildPhonePanel();
     _isOpen = true;
+    _phoneSessionStartTime = Date.now();
     _phoneEl.style.display = 'flex';
     _applyGenreSkin();
     _restorePanelPosition();
@@ -697,9 +703,28 @@ function _buildPhonePanel() {
     _phoneEl.id = 'sillyphone_panel';
     _phoneEl.style.display = 'none';
     _phoneEl.style.position = 'fixed';
-    _phoneEl.innerHTML = _phoneShellHTML();
+    
+    const putDownBtn = `
+    <div id="rpg_phone_putdown_btn" style="position:absolute; top:-40px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.1); backdrop-filter:blur(10px); color:white; padding:8px 16px; border-radius:20px; font-weight:bold; cursor:pointer; font-size:13px; box-shadow:0 4px 12px rgba(0,0,0,0.5); z-index:100; border:1px solid rgba(255,255,255,0.2); white-space:nowrap;">
+      ⬇️ Put down phone
+    </div>`;
+
+    _phoneEl.innerHTML = putDownBtn + _phoneShellHTML();
 
     document.body.appendChild(_phoneEl);
+    
+    _phoneEl.querySelector('#rpg_phone_putdown_btn')?.addEventListener('click', () => {
+        const s = getSettings();
+        if (s.autoPutDownMessage !== false) {
+            const minutes = Math.max(1, Math.round((Date.now() - _phoneSessionStartTime) / 60000));
+            const msg = `*You put down the phone after using it for ${minutes} minute${minutes > 1 ? 's' : ''}.*`;
+            const ctx = getSTContext();
+            if (ctx.executeSlashCommandsWithOptions) {
+                ctx.executeSlashCommandsWithOptions(`/send ${msg}`);
+            }
+        }
+        closePhone();
+    });
 
     _phoneEl.querySelector('#rpg_phone_close_btn')?.addEventListener('click', closePhone);
     _phoneEl.querySelector('#rpg_phone_back_btn')?.addEventListener('click', _navigateBack);
@@ -2457,6 +2482,10 @@ function _renderPhoneSettingsApp(pageId, params, screen) {
     <input type="checkbox" id="rpg_phone_multihog_toggle" ${s.multihogMode ? 'checked' : ''}/>
   </label>
   <label class="rpg-phone-settings-row">
+    <span>Auto-send "Put down phone" chat message</span>
+    <input type="checkbox" id="rpg_phone_autoputdown_toggle" ${s.autoPutDownMessage !== false ? 'checked' : ''}/>
+  </label>
+  <label class="rpg-phone-settings-row">
     <span>Context depth (events in AI context)</span>
     <input type="range" min="1" max="100" value="${s.contextDepth || 20}" id="rpg_phone_ctx_depth_slider"/>
     <span id="rpg_phone_ctx_depth_val">${s.contextDepth || 20}</span>
@@ -2472,6 +2501,7 @@ function _renderPhoneSettingsApp(pageId, params, screen) {
 
     document.getElementById('rpg_phone_card_ctx_toggle')?.addEventListener('change', e => { s.includeCardContext = e.target.checked; saveSettings(); });
     document.getElementById('rpg_phone_multihog_toggle')?.addEventListener('change', e => { s.multihogMode = e.target.checked; saveSettings(); });
+    document.getElementById('rpg_phone_autoputdown_toggle')?.addEventListener('change', e => { s.autoPutDownMessage = e.target.checked; saveSettings(); });
     const depthSlider = document.getElementById('rpg_phone_ctx_depth_slider');
     const depthVal    = document.getElementById('rpg_phone_ctx_depth_val');
     depthSlider?.addEventListener('input', () => { s.contextDepth = parseInt(depthSlider.value, 10); if (depthVal) depthVal.textContent = depthSlider.value; saveSettings(); });
@@ -2508,6 +2538,9 @@ function _buildSettingsHTML() {
   <div class="sillyphone-setting-row">
     <label><input type="checkbox" id="sp_multihog_cb" ${s.multihogMode ? 'checked' : ''}/> Enable Multihog Mode (Read Multihog PC data)</label>
   </div>
+  <div class="sillyphone-setting-row">
+    <label><input type="checkbox" id="sp_autoputdown_cb" ${s.autoPutDownMessage !== false ? 'checked' : ''}/> Auto-send "Put down phone" message to chat</label>
+  </div>
   <h4>Context & NPC</h4>
   <div class="sillyphone-setting-row">
     <label style="flex:1">Context Depth</label>
@@ -2541,6 +2574,7 @@ function _bindSettingsPanel() {
     document.getElementById('sp_enabled_cb')?.addEventListener('change', e => { s.enabled = e.target.checked; saveSettings(); const fab = document.getElementById('sillyphone-fab'); if (fab) fab.style.display = s.enabled ? 'flex' : 'none'; });
     document.getElementById('sp_card_ctx_cb')?.addEventListener('change', e => { s.includeCardContext = e.target.checked; saveSettings(); });
     document.getElementById('sp_multihog_cb')?.addEventListener('change', e => { s.multihogMode = e.target.checked; saveSettings(); });
+    document.getElementById('sp_autoputdown_cb')?.addEventListener('change', e => { s.autoPutDownMessage = e.target.checked; saveSettings(); });
     const ctxSlider = document.getElementById('sp_ctx_depth');
     const ctxLabel  = document.getElementById('sp_ctx_depth_label');
     ctxSlider?.addEventListener('input', () => { s.contextDepth = parseInt(ctxSlider.value, 10); if (ctxLabel) ctxLabel.textContent = ctxSlider.value; saveSettings(); });
