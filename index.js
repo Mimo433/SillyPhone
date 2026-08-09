@@ -46,6 +46,7 @@ const DEFAULTS = {
     panelX: null,
     panelY: null,
     chatData: {},
+    multihogMode: false,
 };
 
 function getSettings() {
@@ -212,8 +213,22 @@ function getInWorldTimeInfo() {
 
 function _getPlayerCharacterInfo() {
     const ctx = getSTContext();
-    const name = ctx.name1 || ctx.personas?.[ctx.persona]?.name || 'Player';
-    const bio  = ctx.personas?.[ctx.persona]?.description || ctx.persona_description || '';
+    const s = getSettings();
+    let name = '';
+    let bio = '';
+
+    if (s.multihogMode && ctx.extensionSettings?.MultihogDnDFramework?.chatStates) {
+        const chatId = getChatId();
+        const mhState = ctx.extensionSettings.MultihogDnDFramework.chatStates[chatId]?.playerCharacter;
+        if (mhState) {
+            name = mhState.name || '';
+            bio = mhState.bio || '';
+        }
+    }
+
+    if (!name) name = ctx.name1 || ctx.personas?.[ctx.persona]?.name || 'Player';
+    if (!bio)  bio  = ctx.personas?.[ctx.persona]?.description || ctx.persona_description || '';
+
     const block = `[PLAYER_CHARACTER]\nName: ${name}${bio ? `\n${bio}` : ''}\n[/PLAYER_CHARACTER]`;
     return { pcName: name, pcBio: bio, pcBlock: block };
 }
@@ -2042,6 +2057,10 @@ function _renderPhoneSettingsApp(pageId, params, screen) {
     <input type="checkbox" id="rpg_phone_card_ctx_toggle" ${s.includeCardContext !== false ? 'checked' : ''}/>
   </label>
   <label class="rpg-phone-settings-row">
+    <span>Multihog Mode (Read PC data from Multihog framework)</span>
+    <input type="checkbox" id="rpg_phone_multihog_toggle" ${s.multihogMode ? 'checked' : ''}/>
+  </label>
+  <label class="rpg-phone-settings-row">
     <span>Context depth (events in AI context)</span>
     <input type="range" min="1" max="100" value="${s.contextDepth || 20}" id="rpg_phone_ctx_depth_slider"/>
     <span id="rpg_phone_ctx_depth_val">${s.contextDepth || 20}</span>
@@ -2056,6 +2075,7 @@ function _renderPhoneSettingsApp(pageId, params, screen) {
 </div>`;
 
     document.getElementById('rpg_phone_card_ctx_toggle')?.addEventListener('change', e => { s.includeCardContext = e.target.checked; saveSettings(); });
+    document.getElementById('rpg_phone_multihog_toggle')?.addEventListener('change', e => { s.multihogMode = e.target.checked; saveSettings(); });
     const depthSlider = document.getElementById('rpg_phone_ctx_depth_slider');
     const depthVal    = document.getElementById('rpg_phone_ctx_depth_val');
     depthSlider?.addEventListener('input', () => { s.contextDepth = parseInt(depthSlider.value, 10); if (depthVal) depthVal.textContent = depthSlider.value; saveSettings(); });
@@ -2089,6 +2109,9 @@ function _buildSettingsHTML() {
   <div class="sillyphone-setting-row">
     <label><input type="checkbox" id="sp_card_ctx_cb" ${s.includeCardContext !== false ? 'checked' : ''}/> Include Active Card Context in AI prompts</label>
   </div>
+  <div class="sillyphone-setting-row">
+    <label><input type="checkbox" id="sp_multihog_cb" ${s.multihogMode ? 'checked' : ''}/> Enable Multihog Mode (Read Multihog PC data)</label>
+  </div>
   <h4>Context & NPC</h4>
   <div class="sillyphone-setting-row">
     <label style="flex:1">Context Depth</label>
@@ -2121,6 +2144,7 @@ function _bindSettingsPanel() {
     const s = getSettings();
     document.getElementById('sp_enabled_cb')?.addEventListener('change', e => { s.enabled = e.target.checked; saveSettings(); const fab = document.getElementById('sillyphone-fab'); if (fab) fab.style.display = s.enabled ? 'flex' : 'none'; });
     document.getElementById('sp_card_ctx_cb')?.addEventListener('change', e => { s.includeCardContext = e.target.checked; saveSettings(); });
+    document.getElementById('sp_multihog_cb')?.addEventListener('change', e => { s.multihogMode = e.target.checked; saveSettings(); });
     const ctxSlider = document.getElementById('sp_ctx_depth');
     const ctxLabel  = document.getElementById('sp_ctx_depth_label');
     ctxSlider?.addEventListener('input', () => { s.contextDepth = parseInt(ctxSlider.value, 10); if (ctxLabel) ctxLabel.textContent = ctxSlider.value; saveSettings(); });
