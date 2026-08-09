@@ -78,6 +78,10 @@ function saveSettings() {
 
 function getChatId() {
     try {
+        if (typeof globalThis._rpgCurrentChatId === 'function') {
+            const id = globalThis._rpgCurrentChatId();
+            if (id) return id;
+        }
         const ctx = getSTContext();
         return ctx.chatId || ctx.chat_id || '_global';
     } catch { return '_global'; }
