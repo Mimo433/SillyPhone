@@ -1220,9 +1220,9 @@ async function _renderRedditApp(pageId, params, screen) {
 
     const renderTabs = (activeTab) => `
 <div class="rpg-phone-reddit-tabs">
+  <button class="rpg-phone-reddit-tab ${activeTab === 'foryou' ? 'active' : ''}" data-tab="foryou">For You</button>
   <button class="rpg-phone-reddit-tab ${activeTab === 'discover' ? 'active' : ''}" data-tab="discover">Discover</button>
   <button class="rpg-phone-reddit-tab ${activeTab === 'joined' ? 'active' : ''}" data-tab="joined">Joined</button>
-  <button class="rpg-phone-reddit-tab ${activeTab === 'following' ? 'active' : ''}" data-tab="following">Following</button>
   <button class="rpg-phone-reddit-tab ${activeTab === 'dms' ? 'active' : ''}" data-tab="dms">Chats</button>
   <button class="rpg-phone-reddit-tab ${activeTab === 'saved' ? 'active' : ''}" data-tab="saved">Saved</button>
 </div>`;
@@ -1231,41 +1231,67 @@ async function _renderRedditApp(pageId, params, screen) {
         screen.querySelectorAll('.rpg-phone-reddit-tab').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tab = btn.dataset.tab;
-                if (tab === 'discover') _navigateTo('reddit', 'home');
+                if (tab === 'foryou') _navigateTo('reddit', 'home');
+                else if (tab === 'discover') _navigateTo('reddit', 'discover');
                 else if (tab === 'joined') _navigateTo('reddit', 'joined_subs');
-                else if (tab === 'following') _navigateTo('reddit', 'following');
                 else if (tab === 'dms') _navigateTo('reddit', 'dm_list');
                 else if (tab === 'saved') _navigateTo('reddit', 'saved');
             });
         });
     };
 
-    if (pageId === 'home' || !pageId) {
-        _logPhoneActivity('reddit', 'Reddit', 'out', 'Opened Reddit');
-        const cacheKey = 'reddit_subs';
+    const _injectSearchBar = (header) => {
+        if (!header) return;
+        const searchHtml = `
+        <div class="rpg-phone-reddit-search">
+          <input type="text" class="rpg-phone-input-small" id="rph_reddit_search_input" placeholder="Search subreddits..." style="flex:1" autocomplete="off"/>
+          <button class="rpg-phone-reddit-btn primary" id="rph_reddit_search_btn" title="Search">🔍</button>
+          <button class="rpg-phone-reddit-btn" id="rph_reddit_go_btn" title="Go directly to sub">Go</button>
+        </div>`;
+        header.insertAdjacentHTML('afterend', searchHtml);
+        const doSearch = () => {
+            const q = document.getElementById('rph_reddit_search_input')?.value.trim();
+            if (q) _navigateTo('reddit', 'search', { query: q });
+        };
+        const doGo = () => {
+            const q = document.getElementById('rph_reddit_search_input')?.value.trim();
+            if (q) _navigateTo('reddit', 'sub', { sub: q.startsWith('r/') ? q : 'r/' + q.replace(/\s+/g, '') });
+        };
+        document.getElementById('rph_reddit_search_btn')?.addEventListener('click', doSearch);
+        document.getElementById('rph_reddit_go_btn')?.addEventListener('click', doGo);
+        document.getElementById('rph_reddit_search_input')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+    };
 
-        const renderHome = (subs) => {
-            _renderRedditSubList(screen, subs, renderTabs('discover'));
+    if (pageId === 'home' || !pageId) {
+        _logPhoneActivity('reddit', 'Reddit', 'out', 'Opened Reddit For You');
+        const cacheKey = 'reddit_subs_foryou';
+        const renderList = (subs) => {
+            _renderRedditSubList(screen, subs, renderTabs('foryou'), {
+                title: 'For You',
+                allowLoadMore: true,
+                onLoadMore: async () => {
+                    try {
+                        const sceneCtx = _buildSceneContext(1000);
+                        const sys = `You generate a list of reddit-like communities fitting this story world. The internet is vast — create GENERAL interest communities, NOT things specifically about the player character or their friends. Reply ONLY valid JSON array.`;
+                        const history = subs.map(s => s.name).join(', ');
+                        const usr = `${sceneCtx}\n\nGenerate 6 NEW relevant subreddits for this world. Exclude these: ${history}. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
+                        const raw  = await sendPhoneRequest(sys, usr);
+                        const match = raw.match(/\[[\s\S]*\]/);
+                        if (match) {
+                            const moreSubs = JSON.parse(match[0]);
+                            ps.phoneCache[cacheKey] = subs.concat(moreSubs);
+                            savePhoneState();
+                            _renderRedditApp('home', params, screen);
+                        }
+                    } catch (e) { console.warn('[SillyPhone] Load more failed', e); }
+                }
+            });
             bindTabs();
-            const header = screen.querySelector('.rpg-phone-reddit-header');
-            if (header) {
-                const searchHtml = `
-                <div class="rpg-phone-reddit-search">
-                  <input type="text" class="rpg-phone-input-small" id="rph_reddit_search_input" placeholder="Search community (e.g. r/news)..." style="flex:1" autocomplete="off"/>
-                  <button class="rpg-phone-reddit-btn primary" id="rph_reddit_search_btn">Go</button>
-                </div>`;
-                header.insertAdjacentHTML('afterend', searchHtml);
-                const go = () => {
-                    const q = document.getElementById('rph_reddit_search_input')?.value.trim();
-                    if (q) _navigateTo('reddit', 'sub', { sub: q.startsWith('r/') ? q : 'r/' + q.replace(/\s+/g, '') });
-                };
-                document.getElementById('rph_reddit_search_btn')?.addEventListener('click', go);
-                document.getElementById('rph_reddit_search_input')?.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
-            }
+            _injectSearchBar(screen.querySelector('.rpg-phone-reddit-header'));
         };
 
         if (ps.phoneCache[cacheKey]) {
-            renderHome(ps.phoneCache[cacheKey]);
+            renderList(ps.phoneCache[cacheKey]);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('home', params, screen); });
             return;
         }
@@ -1278,9 +1304,102 @@ async function _renderRedditApp(pageId, params, screen) {
             const match = raw.match(/\[[\s\S]*\]/);
             const subs  = match ? JSON.parse(match[0]) : [];
             ps.phoneCache[cacheKey] = subs; savePhoneState();
-            renderHome(subs);
+            renderList(subs);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('home', params, screen); });
+        } catch (e) { screen.innerHTML = `${renderTabs('foryou')}<div class="rpg-phone-error">Reddit unavailable: ${_escHtml(e.message)}</div>`; bindTabs(); }
+        return;
+    }
+
+    if (pageId === 'discover') {
+        const cacheKey = 'reddit_subs_discover';
+        const renderList = (subs) => {
+            _renderRedditSubList(screen, subs, renderTabs('discover'), {
+                title: 'Discover',
+                allowLoadMore: true,
+                onLoadMore: async () => {
+                    try {
+                        const sys = `You generate a list of highly popular, generic internet communities (like r/aww, r/gaming, r/food, r/memes, etc.). Reply ONLY valid JSON array.`;
+                        const history = subs.map(s => s.name).join(', ');
+                        const usr = `Generate 6 NEW highly popular generic subreddits. Exclude these: ${history}. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
+                        const raw  = await sendPhoneRequest(sys, usr);
+                        const match = raw.match(/\[[\s\S]*\]/);
+                        if (match) {
+                            const moreSubs = JSON.parse(match[0]);
+                            ps.phoneCache[cacheKey] = subs.concat(moreSubs);
+                            savePhoneState();
+                            _renderRedditApp('discover', params, screen);
+                        }
+                    } catch (e) { console.warn('[SillyPhone] Load more failed', e); }
+                }
+            });
+            bindTabs();
+            _injectSearchBar(screen.querySelector('.rpg-phone-reddit-header'));
+        };
+
+        if (ps.phoneCache[cacheKey]) {
+            renderList(ps.phoneCache[cacheKey]);
+            _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('discover', params, screen); });
+            return;
+        }
+
+        const sys = `You generate a list of highly popular, generic internet communities (like r/aww, r/gaming, r/food, r/memes, etc.). Reply ONLY valid JSON array.`;
+        const usr = `Generate 6 highly popular generic subreddits. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
+        try {
+            screen.innerHTML = `${renderTabs('discover')}<div style="padding:20px;text-align:center;">Discovering popular communities...</div>`;
+            const raw  = await sendPhoneRequest(sys, usr);
+            const match = raw.match(/\[[\s\S]*\]/);
+            const subs  = match ? JSON.parse(match[0]) : [];
+            ps.phoneCache[cacheKey] = subs; savePhoneState();
+            renderList(subs);
+            _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('discover', params, screen); });
         } catch (e) { screen.innerHTML = `${renderTabs('discover')}<div class="rpg-phone-error">Reddit unavailable: ${_escHtml(e.message)}</div>`; bindTabs(); }
+        return;
+    }
+
+    if (pageId === 'search') {
+        const query = params.query;
+        const cacheKey = `reddit_subs_search_${query}`;
+        const renderList = (subs) => {
+            _renderRedditSubList(screen, subs, renderTabs(''), {
+                title: `Search: ${query}`,
+                allowLoadMore: true,
+                onLoadMore: async () => {
+                    try {
+                        const sys = `You generate a list of reddit communities that match a search query. Reply ONLY valid JSON array.`;
+                        const history = subs.map(s => s.name).join(', ');
+                        const usr = `Search Query: "${query}"\nGenerate 6 NEW subreddits matching this query. Exclude these: ${history}. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
+                        const raw  = await sendPhoneRequest(sys, usr);
+                        const match = raw.match(/\[[\s\S]*\]/);
+                        if (match) {
+                            const moreSubs = JSON.parse(match[0]);
+                            ps.phoneCache[cacheKey] = subs.concat(moreSubs);
+                            savePhoneState();
+                            _renderRedditApp('search', params, screen);
+                        }
+                    } catch (e) { console.warn('[SillyPhone] Load more failed', e); }
+                }
+            });
+            bindTabs();
+            _injectSearchBar(screen.querySelector('.rpg-phone-reddit-header'));
+        };
+
+        if (ps.phoneCache[cacheKey]) {
+            renderList(ps.phoneCache[cacheKey]);
+            _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('search', params, screen); });
+            return;
+        }
+
+        const sys = `You generate a list of reddit communities that match a search query. Reply ONLY valid JSON array.`;
+        const usr = `Search Query: "${query}"\nGenerate 6 subreddits matching this query. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
+        try {
+            screen.innerHTML = `${renderTabs('')}<div style="padding:20px;text-align:center;">Searching...</div>`;
+            const raw  = await sendPhoneRequest(sys, usr);
+            const match = raw.match(/\[[\s\S]*\]/);
+            const subs  = match ? JSON.parse(match[0]) : [];
+            ps.phoneCache[cacheKey] = subs; savePhoneState();
+            renderList(subs);
+            _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('search', params, screen); });
+        } catch (e) { screen.innerHTML = `${renderTabs('')}<div class="rpg-phone-error">Search failed: ${_escHtml(e.message)}</div>`; bindTabs(); }
         return;
     }
 
@@ -1649,7 +1768,8 @@ function _bindRedditUserLinks(screen) {
     });
 }
 
-function _renderRedditSubList(screen, subs, tabsHtml = '') {
+function _renderRedditSubList(screen, subs, tabsHtml = '', config = {}) {
+    const title = config.title || 'Discover';
     const html = subs.map((s, i) => `
 <div class="rpg-phone-reddit-sub" data-idx="${i}">
   <div class="rpg-phone-reddit-sub-icon">${s.icon || '🤖'}</div>
@@ -1658,13 +1778,28 @@ function _renderRedditSubList(screen, subs, tabsHtml = '') {
     <div class="rpg-phone-reddit-sub-desc">${_escHtml(s.description || '')}</div>
   </div>
 </div>`).join('');
-    screen.innerHTML = `${tabsHtml}<div class="rpg-phone-reddit-header"><span class="rpg-phone-reddit-logo">reddit</span><span>Discover</span></div>${html}`;
+
+    let extraHtml = '';
+    if (config.allowLoadMore) {
+        extraHtml = `<div style="text-align:center; padding:12px;"><button class="rpg-phone-reddit-btn" id="rph_sublist_loadmore" style="width:100%;justify-content:center;">↻ Load More</button></div>`;
+    }
+
+    screen.innerHTML = `${tabsHtml}<div class="rpg-phone-reddit-header"><span class="rpg-phone-reddit-logo">reddit</span><span>${_escHtml(title)}</span></div>${html}${extraHtml}`;
+    
     screen.querySelectorAll('.rpg-phone-reddit-sub').forEach(el => {
         el.addEventListener('click', () => {
             const idx = parseInt(el.dataset.idx, 10);
             _navigateTo('reddit', 'sub', { sub: subs[idx].name, subData: subs[idx] });
         });
     });
+
+    if (config.allowLoadMore && config.onLoadMore) {
+        document.getElementById('rph_sublist_loadmore')?.addEventListener('click', async (e) => {
+            e.target.disabled = true;
+            e.target.textContent = '...';
+            await config.onLoadMore();
+        });
+    }
 }
 
 function _renderRedditFeed(screen, sub, posts) {
