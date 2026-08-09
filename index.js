@@ -2745,12 +2745,13 @@ function _buildSettingsHTML() {
     const summaryStyle = `cursor:pointer; padding:8px; font-weight:bold; list-style:none; display:flex; align-items:center; user-select:none;`;
     
     return `
-<div id="sillyphone_settings">
-  <div style="font-size:16px; font-weight:bold; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+<details id="sillyphone_settings" style="margin-bottom: 10px;" open>
+  <summary style="cursor:pointer; font-size:16px; font-weight:bold; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
     📱 SillyPhone Settings
-  </div>
-
-  <details style="${detailsStyle}" open>
+  </summary>
+  
+  <div style="padding: 0 4px;">
+    <details style="${detailsStyle}" open>
     <summary style="${summaryStyle}">⚙️ General</summary>
     <div style="padding: 8px;">
       <div class="sillyphone-setting-row" style="margin-bottom:8px;">
@@ -2791,26 +2792,23 @@ function _buildSettingsHTML() {
     </div>
   </details>
   
-  <details style="${detailsStyle}">
-    <summary style="${summaryStyle}">👥 Context & NPC</summary>
-    <div style="padding: 8px;">
-      <div class="sillyphone-setting-row" style="margin-bottom:8px;">
-        <label style="flex:1">Context Depth</label>
-        <input type="range" id="sp_ctx_depth" min="1" max="100" value="${s.contextDepth || 20}"/>
-        <span id="sp_ctx_depth_label">${s.contextDepth || 20}</span>
+    <details style="${detailsStyle}">
+      <summary style="${summaryStyle}">👥 Context & NPC</summary>
+      <div style="padding: 8px;">
+        <div class="sillyphone-setting-row" style="margin-bottom:8px;">
+          <label style="flex:1">Context Depth</label>
+          <input type="range" id="sp_ctx_depth" min="1" max="100" value="${s.contextDepth || 20}"/>
+          <span id="sp_ctx_depth_label">${s.contextDepth || 20}</span>
+        </div>
+        <div class="sillyphone-setting-row" style="margin-bottom:8px;">
+          <label style="flex:1">NPC Contact Chance %</label>
+          <input type="range" id="sp_npc_chance" min="0" max="40" value="${s.npcContactChance ?? 8}"/>
+          <span id="sp_npc_chance_label">${s.npcContactChance ?? 8}%</span>
+        </div>
       </div>
-      <div class="sillyphone-setting-row" style="margin-bottom:8px;">
-        <label style="flex:1">NPC Contact Chance %</label>
-        <input type="range" id="sp_npc_chance" min="0" max="40" value="${s.npcContactChance ?? 8}"/>
-        <span id="sp_npc_chance_label">${s.npcContactChance ?? 8}%</span>
-      </div>
-    </div>
-  </details>
-  
-  <div class="sillyphone-setting-row" style="margin-top:16px;">
-    <button class="rpg-phone-btn rpg-phone-btn-secondary" id="sp_open_btn" style="width:100%;padding:10px;">📱 Open Phone manually</button>
+    </details>
   </div>
-</div>`;
+</details>`;
 }
 
 function _bindSettingsPanel() {
@@ -2838,7 +2836,6 @@ function _bindSettingsPanel() {
     const npcSlider = document.getElementById('sp_npc_chance');
     const npcLabel  = document.getElementById('sp_npc_chance_label');
     npcSlider?.addEventListener('input', () => { s.npcContactChance = parseInt(npcSlider.value, 10); if (npcLabel) npcLabel.textContent = `${npcSlider.value}%`; saveSettings(); });
-    document.getElementById('sp_open_btn')?.addEventListener('click', togglePhone);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
