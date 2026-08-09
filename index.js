@@ -617,21 +617,25 @@ function togglePhone() {
 // Draggable helper
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Makes an element draggable.
+ * onDragEnd is called with (left, top, wasDragged).
+ * wasDragged is true only if the pointer moved more than DRAG_THRESHOLD px.
+ * Returns false from onDragEnd when it was just a click — caller can use this
+ * to distinguish a click from a real drag.
+ */
+const DRAG_THRESHOLD = 6; // pixels
 function _makeDraggable(el, handleEl, onDragEnd) {
-    let x0 = 0, y0 = 0, startL = 0, startT = 0;
+    let x0 = 0, y0 = 0, startL = 0, startT = 0, moved = false;
 
     handleEl.addEventListener('mousedown', startDrag);
     handleEl.addEventListener('touchstart', e => startDrag(e.touches[0]), { passive: true });
 
     function startDrag(e) {
         x0 = e.clientX; y0 = e.clientY;
+        moved = false;
         const rect = el.getBoundingClientRect();
         startL = rect.left; startT = rect.top;
-
-        // Convert fixed/transform to top/left
-        el.style.transform  = 'none';
-        el.style.left = startL + 'px';
-        el.style.top  = startT + 'px';
 
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup',   onUp);
@@ -642,15 +646,24 @@ function _makeDraggable(el, handleEl, onDragEnd) {
     function onMove(e) {
         const dx = e.clientX - x0;
         const dy = e.clientY - y0;
+        // Only start actually moving after threshold — avoids accidental drags on click
+        if (!moved && Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD) return;
+        if (!moved) {
+            // Commit position now that we know it's a real drag
+            moved = true;
+            el.style.transform = 'none';
+            el.style.left = startL + 'px';
+            el.style.top  = startT + 'px';
+        }
         el.style.left = (startL + dx) + 'px';
         el.style.top  = (startT + dy) + 'px';
     }
-    function onUp(e) {
+    function onUp() {
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup',   onUp);
         document.removeEventListener('touchmove',  onTouchMove);
         document.removeEventListener('touchend',   onUp);
-        if (onDragEnd) onDragEnd(el.style.left, el.style.top);
+        if (onDragEnd) onDragEnd(el.style.left, el.style.top, moved);
     }
 }
 
@@ -2140,17 +2153,17 @@ function _buildFAB() {
         fab.style.right  = 'auto';
     }
 
-    // Toggle on click (without drag)
-    let wasDragged = false;
-    fab.addEventListener('click', () => { if (!wasDragged) togglePhone(); });
-
-    // Make draggable
-    _makeDraggable(fab, fab, (left, top) => {
-        const s2 = getSettings();
-        s2.fabX = left; s2.fabY = top;
-        saveSettings();
-        wasDragged = true;
-        setTimeout(() => { wasDragged = false; }, 200);
+    // Toggle on click — _makeDraggable tells us if it was a real drag via the 3rd arg
+    _makeDraggable(fab, fab, (left, top, wasDragged) => {
+        if (wasDragged) {
+            // Only save position on a real drag
+            const s2 = getSettings();
+            s2.fabX = left; s2.fabY = top;
+            saveSettings();
+        } else {
+            // It was a click — open/close the phone
+            togglePhone();
+        }
     });
 
     if (!s.enabled) fab.style.display = 'none';
