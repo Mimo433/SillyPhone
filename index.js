@@ -1318,8 +1318,8 @@ ${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">Y
         
         const renderProfile = (data) => {
             const isFollowing = ps.phoneRedditFollowing.includes(user);
-            const postsHtml = (data.recentPosts || []).map(p => `
-<div class="rpg-phone-reddit-post" style="border:1px solid rgba(255,255,255,0.1);margin:8px 16px;border-radius:8px;">
+            const postsHtml = (data.recentPosts || []).map((p, i) => `
+<div class="rpg-phone-reddit-post" data-idx="${i}" style="border:1px solid rgba(255,255,255,0.1);margin:8px 16px;border-radius:8px;cursor:pointer;">
   <div class="rpg-phone-reddit-post-meta">${_escHtml(p.sub || 'r/all')}</div>
   <div class="rpg-phone-reddit-post-title">${_escHtml(p.title || '')}</div>
   <div class="rpg-phone-reddit-post-meta">⬆ ${p.upvotes || 0} · 💬 ${p.comments || 0}</div>
@@ -1344,6 +1344,16 @@ ${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">Y
             });
             document.getElementById('rph_dm_user')?.addEventListener('click', () => {
                 _navigateTo('reddit', 'dm_thread', { user });
+            });
+            screen.querySelectorAll('.rpg-phone-reddit-post').forEach(el => {
+                el.addEventListener('click', () => {
+                    const idx = parseInt(el.dataset.idx, 10);
+                    const p = data.recentPosts[idx];
+                    if (p) {
+                        p.author = user; // Ensure author is set when viewing from profile
+                        _navigateTo('reddit', 'post', { sub: p.sub || 'r/all', post: p });
+                    }
+                });
             });
         };
 
