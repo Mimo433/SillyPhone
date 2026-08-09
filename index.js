@@ -957,7 +957,7 @@ function _parsePhoneImages(text) {
     return text.replace(/\[IMAGE:\s*(.*?)\]/gi, (match, desc) => {
         const cleanDesc = desc.trim();
         if (ps.phoneImageCache && ps.phoneImageCache[cleanDesc]) {
-            return `<img src="${_escHtml(ps.phoneImageCache[cleanDesc])}" style="width:100%;border-radius:8px;cursor:pointer;display:block;margin-bottom:8px;" onclick="window.open(this.src,'_blank')" />`;
+            return `<img class="rpg-phone-generated-image" data-img-prompt="${_escHtml(cleanDesc)}" src="${_escHtml(ps.phoneImageCache[cleanDesc])}" style="width:100%;border-radius:8px;cursor:pointer;display:block;margin-bottom:8px;" />`;
         }
         return `<div class="rpg-phone-image-placeholder" data-img-prompt="${_escHtml(cleanDesc)}" role="button" tabindex="0">
             <div class="rpg-phone-image-prompt" style="font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:8px;font-style:italic;">"${_escHtml(cleanDesc)}"</div>
@@ -1021,8 +1021,109 @@ function _showPhoneImagePopup(desc, onResult) {
     });
 }
 
+function _showPhoneImageViewerPopup(src, desc, onEdit, onRegenerate) {
+    const overlay = document.createElement('div');
+    overlay.className = 'rpg-phone-popup-overlay';
+    overlay.innerHTML = `
+        <div class="rpg-phone-popup" style="font-family: system-ui, -apple-system, sans-serif; text-align:center;">
+            <img src="${_escHtml(src)}" style="max-width:100%;max-height:60vh;border-radius:8px;margin-bottom:16px;" />
+            <div style="display:flex;gap:8px;justify-content:center;">
+                <button class="rpg-phone-reddit-btn primary" id="rph_img_view_regen" style="flex:1;justify-content:center;padding:8px;">Regenerate</button>
+                <button class="rpg-phone-reddit-btn" id="rph_img_view_edit" style="flex:1;justify-content:center;padding:8px;">Edit Prompt</button>
+            </div>
+            <button class="rpg-phone-reddit-btn" id="rph_img_view_cancel" style="width:100%;justify-content:center;padding:8px;margin-top:8px;">Close</button>
+        </div>
+    `;
+    const container = document.body;
+    container.appendChild(overlay);
+    
+    const close = () => overlay.remove();
+    document.getElementById('rph_img_view_cancel').onclick = close;
+    document.getElementById('rph_img_view_regen').onclick = () => { close(); onRegenerate(); };
+    document.getElementById('rph_img_view_edit').onclick = () => { close(); onEdit(); };
+}
+
 function _bindPhoneImages(screen) {
     if (!screen) return;
+
+    const bindViewer = (imgEl, desc, src) => {
+        if (imgEl._hasViewerListener) return;
+        imgEl._hasViewerListener = true;
+        imgEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            _showPhoneImageViewerPopup(src, desc, 
+                () => {
+                    _showPhoneImagePopup(desc, (result) => _handleImageResult(result, imgEl, desc));
+                },
+                () => {
+                    const s = getSettings();
+                    const cmd = s.imageGenCommand || '/imagine quiet=true "{{prompt}}"';
+                    _handleImageResult({ type: 'generate', desc: desc, cmd: cmd }, imgEl, desc);
+                }
+            );
+        });
+    };
+
+    const _handleImageResult = async (result, el, desc) => {
+        if (result.type === 'upload') {
+            const ps = getPhoneState();
+            if (!ps.phoneImageCache) ps.phoneImageCache = {};
+            ps.phoneImageCache[desc] = result.dataUrl;
+            savePhoneState();
+            
+            const img = document.createElement('img');
+            img.src = result.dataUrl;
+            img.className = 'rpg-phone-generated-image';
+            img.dataset.imgPrompt = desc;
+            img.style.cssText = 'width:100%;border-radius:8px;cursor:pointer;display:block;margin-bottom:8px;';
+            el.replaceWith(img);
+            bindViewer(img, desc, result.dataUrl);
+        } else if (result.type === 'generate') {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'rpg-phone-image-placeholder';
+            wrapper.dataset.generating = 'true';
+            wrapper.innerHTML = '<span>⏳ Generating image…</span>';
+            el.replaceWith(wrapper);
+            
+            try {
+                const ctx = getSTContext();
+                if (ctx.executeSlashCommandsWithOptions) {
+                    const escapedPrompt = result.desc.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    const cmd = result.cmd.replace('{{prompt}}', escapedPrompt);
+                    const res = await ctx.executeSlashCommandsWithOptions(cmd);
+                    if (res?.pipe) {
+                        const ps = getPhoneState();
+                        if (!ps.phoneImageCache) ps.phoneImageCache = {};
+                        ps.phoneImageCache[desc] = res.pipe;
+                        savePhoneState();
+                        
+                        const img = document.createElement('img');
+                        img.src = res.pipe;
+                        img.className = 'rpg-phone-generated-image';
+                        img.dataset.imgPrompt = desc;
+                        img.style.cssText = 'width:100%;border-radius:8px;cursor:pointer;display:block;margin-bottom:8px;';
+                        wrapper.replaceWith(img);
+                        bindViewer(img, desc, res.pipe);
+                        return;
+                    }
+                }
+                wrapper.dataset.generating = '';
+                wrapper.innerHTML = '<span style="color:#ff6b6b">Image generation not available.</span>';
+                wrapper.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    _showPhoneImagePopup(desc, (r) => _handleImageResult(r, wrapper, desc));
+                });
+            } catch (err) {
+                wrapper.dataset.generating = '';
+                wrapper.innerHTML = `<span style="color:#ff6b6b">❌ ${_escHtml(err.message || String(err))}</span>`;
+                wrapper.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    _showPhoneImagePopup(desc, (r) => _handleImageResult(r, wrapper, desc));
+                });
+            }
+        }
+    };
+
     screen.querySelectorAll('.rpg-phone-image-placeholder').forEach(el => {
         if (el._hasImgListener) return;
         el._hasImgListener = true;
@@ -1031,45 +1132,13 @@ function _bindPhoneImages(screen) {
             if (el.dataset.generating === 'true') return;
             const desc = el.dataset.imgPrompt;
             if (!desc) return;
-            
-            _showPhoneImagePopup(desc, async (result) => {
-                if (result.type === 'upload') {
-                    const ps = getPhoneState();
-                    if (!ps.phoneImageCache) ps.phoneImageCache = {};
-                    ps.phoneImageCache[desc] = result.dataUrl;
-                    savePhoneState();
-                    el.innerHTML = `<img src="${_escHtml(result.dataUrl)}" style="width:100%;border-radius:8px;cursor:pointer;display:block;" onclick="window.open(this.src,'_blank')" />`;
-                    el.style.cssText = 'border:none;padding:0;background:transparent;';
-                    el.dataset.generating = 'done';
-                } else if (result.type === 'generate') {
-                    el.dataset.generating = 'true';
-                    el.innerHTML = '<span>⏳ Generating image…</span>';
-                    try {
-                        const ctx = getSTContext();
-                        if (ctx.executeSlashCommandsWithOptions) {
-                            const escapedPrompt = result.desc.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-                            const cmd = result.cmd.replace('{{prompt}}', escapedPrompt);
-                            const res = await ctx.executeSlashCommandsWithOptions(cmd);
-                            if (res?.pipe) {
-                                const ps = getPhoneState();
-                                if (!ps.phoneImageCache) ps.phoneImageCache = {};
-                                ps.phoneImageCache[desc] = res.pipe;
-                                savePhoneState();
-                                el.innerHTML = `<img src="${_escHtml(res.pipe)}" style="width:100%;border-radius:8px;cursor:pointer;display:block;" onclick="window.open(this.src,'_blank')" />`;
-                                el.style.cssText = 'border:none;padding:0;background:transparent;';
-                                el.dataset.generating = 'done';
-                                return;
-                            }
-                        }
-                        el.dataset.generating = '';
-                        el.innerHTML = '<span style="color:#ff6b6b">Image generation not available.</span>';
-                    } catch (err) {
-                        el.dataset.generating = '';
-                        el.innerHTML = `<span style="color:#ff6b6b">❌ ${_escHtml(err.message || String(err))}</span>`;
-                    }
-                }
-            });
+            _showPhoneImagePopup(desc, (result) => _handleImageResult(result, el, desc));
         });
+    });
+
+    screen.querySelectorAll('.rpg-phone-generated-image').forEach(el => {
+        const desc = el.dataset.imgPrompt;
+        if (desc) bindViewer(el, desc, el.src);
     });
 }
 
