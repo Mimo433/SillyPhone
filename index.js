@@ -1670,6 +1670,7 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
 
     if (pageId === 'profile') {
         const user = params.user;
+        const s = getSettings();
         _setNavTitle(user);
         const cacheKey = `reddit_user_${user}`;
         
