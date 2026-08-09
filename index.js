@@ -1649,6 +1649,8 @@ Determine if the subreddit '${params.sub}' and the post title "${post.title}" ar
 - If YES: The post body and comments can relate to the chat context.
 - If NO: The post body and comments MUST be completely unrelated to the characters or their immediate situation. Keep it realistic to a general internet forum written by strangers.
 
+VARY POST LENGTH: Depending on the subreddit and post type (e.g. story, confession, meme, news), the body text length should vary naturally. Some posts are long essays, some are just a short sentence, and some are entirely empty beyond the title/preview. Do not force every post to be a multi-paragraph essay.
+
 Write the body and top comments for this Reddit post in ${params.sub}:
 Title: "${post.title}"
 Flair: ${post.flair || ''}
