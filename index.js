@@ -624,11 +624,28 @@ function _updateNotificationBadge() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 let _phoneSessionStartTime = 0;
+let _phoneActiveTimeMs = 0;
+let _phoneLastActivityTime = 0;
+const IDLE_TIMEOUT_MS = 60000;
+
+function _recordPhoneActivity() {
+    if (!_isOpen) return;
+    const now = Date.now();
+    const delta = now - _phoneLastActivityTime;
+    
+    // Only add time if the gap since last activity is less than the idle timeout
+    if (delta < IDLE_TIMEOUT_MS) {
+        _phoneActiveTimeMs += delta;
+    }
+    _phoneLastActivityTime = now;
+}
 
 function openPhone() {
     if (!_phoneEl) _buildPhonePanel();
     _isOpen = true;
     _phoneSessionStartTime = Date.now();
+    _phoneActiveTimeMs = 0;
+    _phoneLastActivityTime = Date.now();
     _phoneEl.style.display = 'flex';
     _applyGenreSkin();
     _restorePanelPosition();
@@ -637,6 +654,8 @@ function openPhone() {
 }
 
 function closePhone() {
+    if (!_isOpen) return;
+    _recordPhoneActivity(); // flush final delta
     _isOpen = false;
     if (_phoneEl) _phoneEl.style.display = 'none';
 }
@@ -721,10 +740,15 @@ function _buildPhonePanel() {
 
     document.body.appendChild(_phoneEl);
     
+    ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart'].forEach(evt => {
+        _phoneEl.addEventListener(evt, _recordPhoneActivity, { passive: true });
+    });
+    
     _phoneEl.querySelector('#rpg_phone_putdown_btn')?.addEventListener('click', () => {
         const s = getSettings();
         if (s.autoPutDownMessage !== false) {
-            const minutes = Math.max(1, Math.round((Date.now() - _phoneSessionStartTime) / 60000));
+            _recordPhoneActivity(); // ensure final time is captured
+            const minutes = Math.max(1, Math.round(_phoneActiveTimeMs / 60000));
             const msg = `You put down the phone after using it for ${minutes} minute${minutes > 1 ? 's' : ''}.`;
             if (s.putDownMessageToTextbox) {
                 const ta = document.getElementById('send_textarea');
