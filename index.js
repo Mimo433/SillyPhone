@@ -725,7 +725,7 @@ function _buildPhonePanel() {
         const s = getSettings();
         if (s.autoPutDownMessage !== false) {
             const minutes = Math.max(1, Math.round((Date.now() - _phoneSessionStartTime) / 60000));
-            const msg = `*You put down the phone after using it for ${minutes} minute${minutes > 1 ? 's' : ''}.*`;
+            const msg = `You put down the phone after using it for ${minutes} minute${minutes > 1 ? 's' : ''}.`;
             if (s.putDownMessageToTextbox) {
                 const ta = document.getElementById('send_textarea');
                 if (ta) {
