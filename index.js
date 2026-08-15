@@ -855,11 +855,18 @@ function _applyGenreSkin() {
 
 function _restorePanelPosition() {
     const s = getSettings();
-    if (s.panelX && s.panelY && _phoneEl) {
+    if (!_phoneEl) return;
+    
+    if (s.phoneMode) {
+        // On mobile, always center the phone panel on screen
+        _phoneEl.style.transform = 'translate(-50%, -50%)';
+        _phoneEl.style.left = '50%';
+        _phoneEl.style.top  = '50%';
+    } else if (s.panelX && s.panelY) {
         _phoneEl.style.transform = 'none';
         _phoneEl.style.left = s.panelX;
         _phoneEl.style.top  = s.panelY;
-    } else if (_phoneEl) {
+    } else {
         _phoneEl.style.transform = 'translate(-50%, -50%)';
         _phoneEl.style.left = '50%';
         _phoneEl.style.top  = '50%';
