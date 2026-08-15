@@ -678,9 +678,9 @@ function togglePhone() {
  * Returns false from onDragEnd when it was just a click — caller can use this
  * to distinguish a click from a real drag.
  */
-const DRAG_THRESHOLD = 6; // pixels
+const DRAG_THRESHOLD = 12; // pixels — higher for mobile touch tolerance
 function _makeDraggable(el, handleEl, onDragEnd) {
-    let x0 = 0, y0 = 0, startL = 0, startT = 0, moved = false;
+    let x0 = 0, y0 = 0, startL = 0, startT = 0, moved = false, startTime = 0;
 
     handleEl.addEventListener('mousedown', startDrag);
     handleEl.addEventListener('touchstart', e => { e.preventDefault(); startDrag(e.touches[0]); }, { passive: false });
@@ -688,13 +688,14 @@ function _makeDraggable(el, handleEl, onDragEnd) {
     function startDrag(e) {
         x0 = e.clientX; y0 = e.clientY;
         moved = false;
+        startTime = Date.now();
         const rect = el.getBoundingClientRect();
         startL = rect.left; startT = rect.top;
 
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup',   onUp);
         document.addEventListener('touchmove',  onTouchMove, { passive: false });
-        document.addEventListener('touchend',   onUp);
+        document.addEventListener('touchend',   onTouchEnd);
     }
     function onTouchMove(e) { e.preventDefault(); onMove(e.touches[0]); }
     function onMove(e) {
@@ -712,11 +713,20 @@ function _makeDraggable(el, handleEl, onDragEnd) {
         el.style.left = (startL + dx) + 'px';
         el.style.top  = (startT + dy) + 'px';
     }
+    function onTouchEnd(e) {
+        // On mobile, treat short taps (< 300ms, < 15px total movement) as clicks not drags
+        const elapsed = Date.now() - startTime;
+        const touch = e.changedTouches?.[0];
+        let dist = 0;
+        if (touch) dist = Math.sqrt((touch.clientX - x0) ** 2 + (touch.clientY - y0) ** 2);
+        if (elapsed < 300 && dist < 15) moved = false;
+        onUp();
+    }
     function onUp() {
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup',   onUp);
         document.removeEventListener('touchmove',  onTouchMove);
-        document.removeEventListener('touchend',   onUp);
+        document.removeEventListener('touchend',   onTouchEnd);
         if (onDragEnd) onDragEnd(el.style.left, el.style.top, moved);
     }
 }
