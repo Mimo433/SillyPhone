@@ -683,7 +683,7 @@ function _makeDraggable(el, handleEl, onDragEnd) {
     let x0 = 0, y0 = 0, startL = 0, startT = 0, moved = false;
 
     handleEl.addEventListener('mousedown', startDrag);
-    handleEl.addEventListener('touchstart', e => startDrag(e.touches[0]), { passive: true });
+    handleEl.addEventListener('touchstart', e => { e.preventDefault(); startDrag(e.touches[0]); }, { passive: false });
 
     function startDrag(e) {
         x0 = e.clientX; y0 = e.clientY;
@@ -3150,6 +3150,7 @@ function _buildFAB() {
     fab.id = 'sillyphone-fab';
     fab.title = 'SillyPhone';
     fab.innerHTML = `📱<span id="sillyphone-fab-badge"></span>`;
+    fab.style.touchAction = 'none'; // prevent mobile browser from hijacking touch for scroll
     document.body.appendChild(fab);
 
     // Restore saved position
@@ -3163,8 +3164,8 @@ function _buildFAB() {
         fab.style.transform = 'none';
     } else if (s.phoneMode) {
         fab.style.position = 'fixed';
-        fab.style.left = 'calc(50% - 25px)';
-        fab.style.top = 'calc(50% - 25px)';
+        fab.style.left = 'calc(50% - 28px)';
+        fab.style.top = 'calc(50% - 28px)';
         fab.style.bottom = 'auto';
         fab.style.right = 'auto';
         fab.style.transform = 'none';

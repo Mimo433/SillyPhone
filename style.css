@@ -3,8 +3,10 @@
 /* Floating draggable phone icon */
 #sillyphone-fab {
     position: fixed;
-    bottom: 100px;
-    right: 24px;
+    top: calc(100vh - 156px);
+    left: calc(100vw - 80px);
+    bottom: auto;
+    right: auto;
     width: 56px;
     height: 56px;
     border-radius: 50%;
@@ -18,11 +20,13 @@
     justify-content: center;
     z-index: 99998;
     box-shadow: 0 6px 24px rgba(108,99,255,0.55), 0 2px 8px rgba(0,0,0,0.4);
-    transition: transform 0.15s, box-shadow 0.15s;
+    transition: box-shadow 0.15s;
     user-select: none;
+    touch-action: none;
+    -webkit-touch-callout: none;
 }
-#sillyphone-fab:hover { transform: scale(1.08); box-shadow: 0 8px 28px rgba(108,99,255,0.7), 0 3px 10px rgba(0,0,0,0.5); }
-#sillyphone-fab:active { cursor: grabbing; transform: scale(0.97); }
+#sillyphone-fab:hover { box-shadow: 0 8px 28px rgba(108,99,255,0.7), 0 3px 10px rgba(0,0,0,0.5); }
+#sillyphone-fab:active { cursor: grabbing; }
 #sillyphone-fab-badge {
     position: absolute;
     top: -4px; right: -4px;
