@@ -3154,19 +3154,21 @@ function _buildFAB() {
 
     // Restore saved position
     const s = getSettings();
-    if (s.phoneMode) {
-        fab.style.position = 'fixed';
-        fab.style.left = '50%';
-        fab.style.top = '50%';
-        fab.style.transform = 'translate(-50%, -50%)';
-        fab.style.bottom = 'auto';
-        fab.style.right = 'auto';
-    } else if (s.fabX && s.fabY) {
+    if (s.fabX && s.fabY) {
         fab.style.position = 'fixed';
         fab.style.left   = s.fabX;
         fab.style.top    = s.fabY;
         fab.style.bottom = 'auto';
         fab.style.right  = 'auto';
+        fab.style.transform = 'none';
+    } else if (s.phoneMode) {
+        fab.style.position = 'fixed';
+        fab.style.left = 'calc(50% - 25px)';
+        fab.style.top = 'calc(50% - 25px)';
+        fab.style.bottom = 'auto';
+        fab.style.right = 'auto';
+        fab.style.transform = 'none';
+    } else {
         fab.style.transform = 'none';
     }
 
@@ -3215,7 +3217,7 @@ If they did, return a JSON payload to navigate the UI:
 {"navigate": true, "app": "messages"|"reddit", "target": "npc_name" or "subreddit_name"}
 If they didn't, return {"navigate": false}
 Reply ONLY with valid JSON.`;
-        const usr = `Recent narrative:\n${combinedNarrative.slice(-1500)}\n\nDid the roleplay just show the player navigating their phone? Return JSON.`;
+        const usr = `Recent narrative:\n${combinedNarrative}\n\nDid the roleplay just show the player navigating their phone? Return JSON.`;
 
         const raw = await sendPhoneRequest(sys, usr);
         const match = raw.match(/\{[\s\S]*\}/);
