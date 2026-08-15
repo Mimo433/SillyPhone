@@ -51,6 +51,9 @@ const DEFAULTS = {
     putDownMessageToTextbox: false,
     imageGenCommand: '/imagine quiet=true "{{prompt}}"',
     imagePromptInstruction: 'detailed visual description of the photo if applicable, else empty string',
+    phoneMode: false,
+    profileVisualPrompt: 'Detailed physical description (body type, size, eye color, facial shape, hair style, hair colors, glasses, makeup, clothing style)',
+    experimentalAutoNavigate: false,
 };
 
 function getSettings() {
@@ -794,8 +797,10 @@ function _buildPhonePanel() {
 }
 
 function _phoneShellHTML() {
+    const s = getSettings();
+    const scaleStyle = s.phoneMode ? 'transform: scale(0.85); transform-origin: center center;' : '';
     return `
-<div class="rpg-phone-shell">
+<div class="rpg-phone-shell" style="${scaleStyle}">
   <div class="rpg-phone-notch"></div>
   <div class="rpg-phone-statusbar" id="rpg_phone_statusbar">
     <span class="rpg-phone-time" id="rpg_phone_time">12:00</span>
@@ -1675,10 +1680,13 @@ Determine if the subreddit '${params.sub}' and the post title "${post.title}" ar
 
 VARY POST LENGTH: Depending on the subreddit and post type (e.g. story, confession, meme, news), the body text length should vary naturally. Some posts are long essays, some are just a short sentence, and some are entirely empty beyond the title/preview. Do not force every post to be a multi-paragraph essay.
 
+        const authorProfile = post.author ? ps.phoneCache[`reddit_user_${post.author}`] : null;
+        const authorVisual = authorProfile?.visualProfile ? `\nAuthor Visual Profile (incorporate this into image prompts if the author is pictured): ${authorProfile.visualProfile}` : '';
+
 Write the body and top comments for this Reddit post in ${params.sub}:
 Title: "${post.title}"
 Flair: ${post.flair || ''}
-Preview: ${post.preview || ''}
+Preview: ${post.preview || ''}${authorVisual}
 
 Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","upvotes":0,"text":"comment text","replies":[{"author":"u/name","upvotes":0,"text":"reply"}]}]}`;
         try {
@@ -1712,7 +1720,8 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
   <div class="rpg-phone-reddit-profile-avatar">${user.replace('u/','')[0]?.toUpperCase() || 'U'}</div>
   <div class="rpg-phone-reddit-profile-name">${_escHtml(user)}</div>
   <div class="rpg-phone-reddit-profile-bio">${_escHtml(data.bio || '')}</div>
-  <div style="display:flex;gap:8px;justify-content:center;">
+  ${data.visualProfile ? `<div style="font-style:italic; font-size:11px; color:#aaa; margin-top:8px; line-height:1.2;">[OOC Visual: ${_escHtml(data.visualProfile)}]</div>` : ''}
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">
     <button class="rpg-phone-reddit-btn ${isFollowing ? '' : 'primary'}" id="rph_follow_user">${isFollowing ? 'Following' : 'Follow'}</button>
     <button class="rpg-phone-reddit-btn" id="rph_dm_user">Message</button>
     <button class="rpg-phone-reddit-btn" id="rph_refresh_profile" title="Refresh Activity">↻</button>
@@ -1733,7 +1742,7 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
                 btn.disabled = true;
                 btn.textContent = '...';
                 const sys = `You generate a Reddit user profile. Reply ONLY valid JSON.`;
-                const usr = `Generate 5 NEW recent posts for reddit user ${user}. Maintain this established vibe/bio:\n"${data.bio}"\nFormat: {"bio":"${data.bio}","recentPosts":[{"title":"","sub":"r/name","upvotes":0,"comments":0,"imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>"}]}`;
+                const usr = `Generate 5 NEW recent posts for reddit user ${user}. Maintain this established vibe/bio:\n"${data.bio}"\nFormat: {"bio":"${data.bio}","visualProfile":${JSON.stringify(data.visualProfile || '')},"recentPosts":[{"title":"","sub":"r/name","upvotes":0,"comments":0,"imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>"}]}`;
                 try {
                     const raw = await sendPhoneRequest(sys, usr);
                     const match = raw.match(/\{[\s\S]*\}/);
@@ -1762,7 +1771,8 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
 
         const sys = `You generate a Reddit user profile. Reply ONLY valid JSON.`;
         const profileCtx = params.context ? `This user was found via this context:\n${params.context}\nMake sure their bio and recent posts align with this personality.` : '';
-        const usr = `Generate a realistic profile for reddit user ${user}. ${profileCtx}\nFormat: {"bio":"short bio","recentPosts":[{"title":"","sub":"r/name","upvotes":0,"comments":0,"imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>"}]}`;
+        const visualInst = s.profileVisualPrompt ? `\nGenerate a detailed "visualProfile" string for them adhering to: ${s.profileVisualPrompt}` : '';
+        const usr = `Generate a realistic profile for reddit user ${user}. ${profileCtx}${visualInst}\nFormat: {"bio":"short bio","visualProfile":"detailed appearance","recentPosts":[{"title":"","sub":"r/name","upvotes":0,"comments":0,"imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>"}]}`;
         try {
             screen.innerHTML = `<div class="rpg-phone-loading"><div class="rpg-phone-spinner"></div><p>Loading Profile…</p></div>`;
             const raw = await sendPhoneRequest(sys, usr);
@@ -3026,6 +3036,12 @@ function _buildSettingsHTML() {
         <div class="sillyphone-setting-row" style="margin-bottom:8px;">
           <label><input type="checkbox" id="sp_multihog_cb" ${s.multihogMode ? 'checked' : ''}/> Enable Multihog Mode (Read PC data)</label>
         </div>
+        <div class="sillyphone-setting-row" style="margin-bottom:8px;">
+          <label><input type="checkbox" id="sp_phone_mode_cb" ${s.phoneMode ? 'checked' : ''}/> Phone Mode (Mobile layout support)</label>
+        </div>
+        <div class="sillyphone-setting-row" style="margin-bottom:8px;">
+          <label><input type="checkbox" id="sp_auto_nav_cb" ${s.experimentalAutoNavigate ? 'checked' : ''}/> [Experimental] Auto-Navigate on Phone Action</label>
+        </div>
       </div>
     </div>
 
@@ -3057,9 +3073,13 @@ function _buildSettingsHTML() {
           <label style="flex:1" title="Use {{prompt}} to inject the visual description">Slash Command</label>
           <input type="text" id="sp_img_cmd" style="flex:2;background:var(--SmartThemeDarkerColor);color:var(--SmartThemeBodyColor);border:1px solid var(--SmartThemeBorderColor);border-radius:4px;padding:4px;" value="${_escHtml(s.imageGenCommand || '/imagine quiet=true "{{prompt}}"')}"/>
         </div>
-        <div class="sillyphone-setting-row" style="flex-direction:column; align-items:stretch; gap:4px;">
+        <div class="sillyphone-setting-row" style="flex-direction:column; align-items:stretch; gap:4px; margin-bottom:8px;">
           <label title="Instructions given to the AI on how to write the image prompt">AI Instruction</label>
           <textarea id="sp_img_inst" rows="3" style="background:var(--SmartThemeDarkerColor);color:var(--SmartThemeBodyColor);border:1px solid var(--SmartThemeBorderColor);border-radius:4px;padding:6px;resize:vertical;font-family:inherit;">${_escHtml(s.imagePromptInstruction || 'detailed visual description of the photo if applicable, else empty string')}</textarea>
+        </div>
+        <div class="sillyphone-setting-row" style="flex-direction:column; align-items:stretch; gap:4px;">
+          <label title="Profile generation visual guidelines for persistence across posts">Profile Visual Prompt</label>
+          <textarea id="sp_prof_vis_inst" rows="3" style="background:var(--SmartThemeDarkerColor);color:var(--SmartThemeBodyColor);border:1px solid var(--SmartThemeBorderColor);border-radius:4px;padding:6px;resize:vertical;font-family:inherit;">${_escHtml(s.profileVisualPrompt || 'Detailed physical description (body type, size, eye color, facial shape, hair style, hair colors, glasses, makeup, clothing style)')}</textarea>
         </div>
       </div>
     </div>
@@ -3106,6 +3126,9 @@ function _bindSettingsPanel() {
     document.getElementById('sp_putdown_textbox_cb')?.addEventListener('change', e => { s.putDownMessageToTextbox = e.target.checked; saveSettings(); });
     document.getElementById('sp_img_cmd')?.addEventListener('change', e => { s.imageGenCommand = e.target.value; saveSettings(); });
     document.getElementById('sp_img_inst')?.addEventListener('change', e => { s.imagePromptInstruction = e.target.value; saveSettings(); });
+    document.getElementById('sp_phone_mode_cb')?.addEventListener('change', e => { s.phoneMode = e.target.checked; saveSettings(); });
+    document.getElementById('sp_auto_nav_cb')?.addEventListener('change', e => { s.experimentalAutoNavigate = e.target.checked; saveSettings(); });
+    document.getElementById('sp_prof_vis_inst')?.addEventListener('change', e => { s.profileVisualPrompt = e.target.value; saveSettings(); });
     const ctxSlider = document.getElementById('sp_ctx_depth');
     const ctxLabel  = document.getElementById('sp_ctx_depth_label');
     ctxSlider?.addEventListener('input', () => { s.contextDepth = parseInt(ctxSlider.value, 10); if (ctxLabel) ctxLabel.textContent = ctxSlider.value; saveSettings(); });
@@ -3129,12 +3152,20 @@ function _buildFAB() {
 
     // Restore saved position
     const s = getSettings();
-    if (s.fabX && s.fabY) {
+    if (s.phoneMode) {
+        fab.style.position = 'fixed';
+        fab.style.left = '50%';
+        fab.style.top = '50%';
+        fab.style.transform = 'translate(-50%, -50%)';
+        fab.style.bottom = 'auto';
+        fab.style.right = 'auto';
+    } else if (s.fabX && s.fabY) {
         fab.style.position = 'fixed';
         fab.style.left   = s.fabX;
         fab.style.top    = s.fabY;
         fab.style.bottom = 'auto';
         fab.style.right  = 'auto';
+        fab.style.transform = 'none';
     }
 
     // Toggle on click — _makeDraggable tells us if it was a real drag via the 3rd arg
@@ -3158,6 +3189,52 @@ function _buildFAB() {
 // Event hooks
 // ─────────────────────────────────────────────────────────────────────────────
 
+async function _tryAutoNavigate() {
+    try {
+        const ctx = getSTContext();
+        const chat = Array.isArray(ctx.chat) ? ctx.chat : [];
+        if (!chat.length) return;
+
+        // Grab the last few messages to give context
+        const recentMessages = chat.slice(-4).map(m => {
+            const raw = String(m.mes || m.content || '').trim();
+            return cleanToolCallMessage(raw);
+        }).filter(Boolean);
+        const combinedNarrative = recentMessages.join('\n\n');
+        
+        // Quick regex check to avoid unnecessary API calls if no phone words exist in the recent narrative
+        const lastMsg = recentMessages[recentMessages.length - 1] || '';
+        if (!/(phone|screen|tap|swipe|alert|notification|message|text|call|app|reddit)/i.test(lastMsg)) {
+            return;
+        }
+
+        const sys = `You are a UI automation agent. Determine if the recent roleplay explicitly describes the player navigating a smartphone interface (e.g. opening an app, checking a message, opening a subreddit).
+If they did, return a JSON payload to navigate the UI:
+{"navigate": true, "app": "messages"|"reddit", "target": "npc_name" or "subreddit_name"}
+If they didn't, return {"navigate": false}
+Reply ONLY with valid JSON.`;
+        const usr = `Recent narrative:\n${combinedNarrative.slice(-1500)}\n\nDid the roleplay just show the player navigating their phone? Return JSON.`;
+
+        const raw = await sendPhoneRequest(sys, usr);
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (!match) return;
+        const parsed = JSON.parse(match[0]);
+
+        if (parsed.navigate && parsed.app) {
+            if (!_isOpen) openPhone();
+            if (parsed.app === 'messages') {
+                if (parsed.target) _navigateTo('reddit', 'dm_thread', { user: parsed.target });
+                else _navigateTo('reddit', 'dm_list');
+            } else if (parsed.app === 'reddit') {
+                if (parsed.target) _navigateTo('reddit', 'feed', { sub: parsed.target });
+                else _navigateTo('reddit', 'home');
+            }
+        }
+    } catch (e) {
+        console.warn('[SillyPhone] Auto-navigate failed:', e);
+    }
+}
+
 function _hookEvents() {
     const ctx = getSTContext();
     if (!ctx.eventSource || !ctx.event_types) {
@@ -3176,6 +3253,11 @@ function _hookEvents() {
         _updateStatusBar();
         _updateNotificationBadge();
         maybeFireNpcContact();
+        
+        const s = getSettings();
+        if (s.experimentalAutoNavigate) {
+            _tryAutoNavigate();
+        }
     });
 
     // Chat changed → reset per-turn state

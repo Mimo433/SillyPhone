@@ -1,5 +1,26 @@
 # SillyPhone Changelog
 
+## [1.3.0] - Automated Navigation & Persistent Visuals
+
+### ✨ New Features
+
+#### **[Experimental] Automated Phone Navigation**
+- SillyPhone can now automatically operate itself based on your roleplay!
+- When enabled in settings, a background AI task will read your chat messages (e.g. if you write "I tap the Reddit notification to read the message").
+- If it detects you interacting with the phone in your roleplay, it will automatically open the phone UI and navigate directly to the correct app or screen (like opening a specific NPC's messages or a specific subreddit) without you needing to click anything!
+
+#### **Mobile Layout Support ("Phone Mode")**
+- Added a new `Phone Mode` toggle in settings designed for playing on mobile devices.
+- When enabled, the phone interface is scaled down slightly to fit on smaller screens.
+- The floating phone icon now forcefully spawns in the exact center of your screen so it is always within reach and never cut off by mobile browser UI bars.
+
+#### **Persistent Visual Profiles for NPCs/Users**
+- Profile generation now strictly adheres to a customizable `Profile Visual Prompt` (configurable in settings).
+- By default, it generates a detailed visual description of the character (body type, hair style, clothing, glasses, etc.) and permanently caches it to their profile.
+- This visual profile is displayed at the bottom of their profile page as an OOC reference so you can imagine what they look like even if you don't generate images.
+- When this character makes a Reddit post with an attached image, their specific visual profile is injected directly into the image prompt, guaranteeing that their physical appearance remains 100% consistent across all their posts!
+
+
 ## [1.2.0] - Reddit Expansion & QoL Updates
 
 ### ✨ New Features
