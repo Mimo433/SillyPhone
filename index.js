@@ -444,14 +444,14 @@ async function maybeFireNpcContact() {
             if (cardInfo?.cardBlock) cardBlockStr = `${cardInfo.cardBlock}\n\n`;
         }
 
-        const systemPrompt = `You decide if an NPC should contact the player via phone right now. Be realistic and conservative — only say yes when it genuinely fits the current situation. Reply ONLY with valid JSON.`;
+        const systemPrompt = `You decide if an NPC should contact the player via phone right now. Be realistic and conservative — only say yes when it genuinely fits the current situation. Reply ONLY with valid JSON. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
         const userPrompt = `${cardBlockStr}NPC: ${chosen}
 Recent story events:
 ${combinedNarrative.slice(-1500)}
 
 Would ${chosen} realistically reach out to the player right now via phone?
 Consider: their relationship, what just happened, urgency, time of day.
-Reply ONLY with: {"contact": true, "type": "text"|"call"|"missed_call", "message": "<what they say or null for missed_call>"} or {"contact": false}`;
+Reply ONLY with: {"contact": true, "type": "text"|"call"|"missed_call", "message": "<what they say or null for missed_call>"} or {"contact": false} CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
 
         let raw;
         try { raw = await sendPhoneRequest(systemPrompt, userPrompt); } catch { return; }
@@ -1258,7 +1258,7 @@ async function _renderGoogleApp(pageId, params, screen) {
         }
 
         const sceneCtx = _buildSceneContext(1200);
-        const sys = `You simulate Google search results in this fictional narrative world. Reply ONLY with valid JSON array — no markdown, no explanation.`;
+        const sys = `You simulate Google search results in this fictional narrative world. Reply ONLY with valid JSON array — no markdown, no explanation. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
         const usr = `${sceneCtx}\n\nGenerate 5 realistic Google search results for the query: "${query}"\nJSON: [{"url":"","title":"","snippet":""}]`;
         try {
             const raw = await sendPhoneRequest(sys, usr);
@@ -1391,7 +1391,7 @@ async function _renderRedditApp(pageId, params, screen) {
                 onLoadMore: async () => {
                     try {
                         const sceneCtx = _buildSceneContext(1000);
-                        const sys = `You generate a list of reddit-like communities fitting this story world. The internet is vast — create GENERAL interest communities, NOT things specifically about the player character or their friends. Reply ONLY valid JSON array.`;
+                        const sys = `You generate a list of reddit-like communities fitting this story world. The internet is vast — create GENERAL interest communities, NOT things specifically about the player character or their friends. Reply ONLY valid JSON array. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
                         const history = subs.map(s => s.name).join(', ');
                         const usr = `${sceneCtx}\n\nGenerate 6 NEW relevant subreddits for this world. Exclude these: ${history}. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
                         const raw  = await sendPhoneRequest(sys, usr);
@@ -1416,7 +1416,7 @@ async function _renderRedditApp(pageId, params, screen) {
         }
 
         const sceneCtx = _buildSceneContext(1000);
-        const sys = `You generate a list of reddit-like communities fitting this story world. The internet is vast — create GENERAL interest communities, NOT things specifically about the player character or their friends. Reply ONLY valid JSON array.`;
+        const sys = `You generate a list of reddit-like communities fitting this story world. The internet is vast — create GENERAL interest communities, NOT things specifically about the player character or their friends. Reply ONLY valid JSON array. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
         const usr = `${sceneCtx}\n\nGenerate 6 relevant subreddits for this world. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
         try {
             const raw  = await sendPhoneRequest(sys, usr);
@@ -1437,7 +1437,7 @@ async function _renderRedditApp(pageId, params, screen) {
                 allowLoadMore: true,
                 onLoadMore: async () => {
                     try {
-                        const sys = `You generate a list of highly popular, generic internet communities (like r/aww, r/gaming, r/food, r/memes, etc.). Reply ONLY valid JSON array.`;
+                        const sys = `You generate a list of highly popular, generic internet communities (like r/aww, r/gaming, r/food, r/memes, etc.). Reply ONLY valid JSON array. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
                         const history = subs.map(s => s.name).join(', ');
                         const usr = `Generate 6 NEW highly popular generic subreddits. Exclude these: ${history}. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
                         const raw  = await sendPhoneRequest(sys, usr);
@@ -1461,7 +1461,7 @@ async function _renderRedditApp(pageId, params, screen) {
             return;
         }
 
-        const sys = `You generate a list of highly popular, generic internet communities (like r/aww, r/gaming, r/food, r/memes, etc.). Reply ONLY valid JSON array.`;
+        const sys = `You generate a list of highly popular, generic internet communities (like r/aww, r/gaming, r/food, r/memes, etc.). Reply ONLY valid JSON array. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
         const usr = `Generate 6 highly popular generic subreddits. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
         try {
             screen.innerHTML = `${renderTabs('discover')}<div style="padding:20px;text-align:center;">Discovering popular communities...</div>`;
@@ -1484,7 +1484,7 @@ async function _renderRedditApp(pageId, params, screen) {
                 allowLoadMore: true,
                 onLoadMore: async () => {
                     try {
-                        const sys = `You generate a list of reddit communities that match a search query. Reply ONLY valid JSON array.`;
+                        const sys = `You generate a list of reddit communities that match a search query. Reply ONLY valid JSON array. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
                         const history = subs.map(s => s.name).join(', ');
                         const usr = `Search Query: "${query}"\nGenerate 6 NEW subreddits matching this query. Exclude these: ${history}. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
                         const raw  = await sendPhoneRequest(sys, usr);
@@ -1508,7 +1508,7 @@ async function _renderRedditApp(pageId, params, screen) {
             return;
         }
 
-        const sys = `You generate a list of reddit communities that match a search query. Reply ONLY valid JSON array.`;
+        const sys = `You generate a list of reddit communities that match a search query. Reply ONLY valid JSON array. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
         const usr = `Search Query: "${query}"\nGenerate 6 subreddits matching this query. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
         try {
             screen.innerHTML = `${renderTabs('')}<div style="padding:20px;text-align:center;">Searching...</div>`;
@@ -1656,7 +1656,7 @@ ${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">Y
 
         const s = getSettings();
         const sceneCtx = _buildSceneContext(1000);
-        const sys = `You generate realistic Reddit posts for the community ${sub} in this story world. Reply ONLY valid JSON array.`;
+        const sys = `You generate realistic Reddit posts for the community ${sub} in this story world. Reply ONLY valid JSON array. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
         const usr = `${sceneCtx}\n\n${subCtx}
 CRITICAL INSTRUCTION:
 Determine if the subreddit '${sub}' is directly related to the specific events or topics in the chat context above.
@@ -1689,7 +1689,7 @@ Generate 6 Reddit posts for ${sub}. Format: [{"title":"","flair":"","author":"u/
 
         const s = getSettings();
         const sceneCtx = _buildSceneContext(1000);
-        const sys = `You write the body text and comments for a Reddit post in this story world. Reply ONLY valid JSON.`;
+        const sys = `You write the body text and comments for a Reddit post in this story world. Reply ONLY valid JSON. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
         
         const ps = getPhoneState();
         const authorProfile = post.author ? ps?.phoneCache?.[`reddit_user_${post.author}`] : null;
@@ -1707,7 +1707,7 @@ Title: "${post.title}"
 Flair: ${post.flair || ''}
 Preview: ${post.preview || ''}${authorVisual}
 
-Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","upvotes":0,"text":"comment text","replies":[{"author":"u/name","upvotes":0,"text":"reply"}]}]}`;
+Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","upvotes":0,"text":"comment text","replies":[{"author":"u/name","upvotes":0,"text":"reply"}]}]} CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
         try {
             const raw   = await sendPhoneRequest(sys, usr);
             const match  = raw.match(/\{[\s\S]*\}/);
@@ -1760,7 +1760,7 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
                 const btn = document.getElementById('rph_refresh_profile');
                 btn.disabled = true;
                 btn.textContent = '...';
-                const sys = `You generate a Reddit user profile. Reply ONLY valid JSON.`;
+                const sys = `You generate a Reddit user profile. Reply ONLY valid JSON. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
                 const usr = `Generate 5 NEW recent posts for reddit user ${user}. Maintain this established vibe/bio:\n"${data.bio}"\nFormat: {"bio":"${data.bio}","visualProfile":${JSON.stringify(data.visualProfile || '')},"recentPosts":[{"title":"","sub":"r/name","upvotes":0,"comments":0,"imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>"}]}`;
                 try {
                     const raw = await sendPhoneRequest(sys, usr);
@@ -1788,7 +1788,7 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
 
         if (ps.phoneCache[cacheKey]) { renderProfile(ps.phoneCache[cacheKey]); return; }
 
-        const sys = `You generate a Reddit user profile. Reply ONLY valid JSON.`;
+        const sys = `You generate a Reddit user profile. Reply ONLY valid JSON. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
         const profileCtx = params.context ? `This user was found via this context:\n${params.context}\nMake sure their bio and recent posts align with this personality.` : '';
         const visualInst = s.profileVisualPrompt ? `\nGenerate a detailed "visualProfile" string for them adhering to: ${s.profileVisualPrompt}` : '';
         const usr = `Generate a realistic profile for reddit user ${user}. ${profileCtx}${visualInst}\nFormat: {"bio":"short bio","visualProfile":"detailed appearance","recentPosts":[{"title":"","sub":"r/name","upvotes":0,"comments":0,"imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>"}]}`;
@@ -2082,7 +2082,7 @@ function _renderRedditPost(screen, post, sub, data) {
         btn.disabled = true;
         btn.textContent = '...';
         const sceneCtx = _buildSceneContext(800);
-        const sys = `You write Reddit comments. Reply ONLY valid JSON array.`;
+        const sys = `You write Reddit comments. Reply ONLY valid JSON array. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
         const historyStr = data.comments.map(c => `${c.author}: ${c.text}`).join('\n');
         const usr = `${sceneCtx}\n\nPost Title: "${post.title}"\nExisting Comments:\n${historyStr}\n\nGenerate 3 NEW top-level comments to append to this thread from strangers on the internet. Format: [{"author":"u/name","upvotes":0,"text":"comment text","replies":[]}]`;
         try {
@@ -2124,7 +2124,7 @@ function _renderRedditPost(screen, post, sub, data) {
         // Trigger AI to generate a reply
         try {
             const sceneCtx = _buildSceneContext(800);
-            const sys = `You generate a reply to a user's comment on a Reddit post in this story world. The author is a stranger. Reply ONLY valid JSON.`;
+            const sys = `You generate a reply to a user's comment on a Reddit post in this story world. The author is a stranger. Reply ONLY valid JSON. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
             const usr = `${sceneCtx}\n\nPost: "${post.title}"\nUser (${myUsername}) commented: "${text}"\nGenerate 1 realistic Reddit reply to this comment from another user.\nFormat: {"author":"u/name","upvotes":0,"text":"comment text"}`;
             const raw = await sendPhoneRequest(sys, usr);
             const match = raw.match(/\{[\s\S]*\}/);
@@ -2236,7 +2236,7 @@ async function _renderAppStoreApp(pageId, params, screen) {
             screen.innerHTML = `<div class="rpg-phone-loading"><div class="rpg-phone-spinner"></div><p>Creating ${_escHtml(name)}…</p></div>`;
 
             const sceneCtx = _buildSceneContext(1200);
-            const sys = `You design a JSON blueprint for a fictional smartphone app that fits this story world. Reply ONLY valid JSON.`;
+            const sys = `You design a JSON blueprint for a fictional smartphone app that fits this story world. Reply ONLY valid JSON. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
             const usr = `${sceneCtx}\n\nDesign the app: "${name}" — ${desc}\nBlueprint format: {"id":"slug","name":"","icon":"","description":"","tagline":"","categories":["cat1","cat2"],"feedLabel":"Latest","feedItems":[{"title":"","subtitle":"","badge":"","description":"","stats":{"stat1":"val"},"actions":[{"label":"Action","prompt":"<instruction for AI>"}],"reviews":[{"user":"","text":""}]}]}`;
             try {
                 const raw   = await sendPhoneRequest(sys, usr);
@@ -2276,7 +2276,7 @@ async function _renderInstalledApp(appId, pageId, params, screen) {
         const cacheKey = `app_feed_${appId}`;
         if (ps.phoneCache[cacheKey]) { _renderAppFeed(screen, app, ps.phoneCache[cacheKey]); return; }
         const sceneCtx = _buildSceneContext(800);
-        const sys = `You generate fresh content for the app "${app.name}" (${app.description || ''}) in this story world. Reply ONLY valid JSON array matching the app blueprint.`;
+        const sys = `You generate fresh content for the app "${app.name}" (${app.description || ''}) in this story world. Reply ONLY valid JSON array CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text! matching the app blueprint.`;
         const usr = `${sceneCtx}\n\nGenerate 5 content cards for ${app.name}. Use same structure as the blueprint feedItems: [{"title":"","subtitle":"","badge":"","description":"","stats":{},"actions":[{"label":"","prompt":""}],"reviews":[]}]`;
         try {
             const raw   = await sendPhoneRequest(sys, usr);
@@ -3234,7 +3234,7 @@ async function _tryAutoNavigate() {
 If they did, return a JSON payload to navigate the UI:
 {"navigate": true, "app": "messages"|"reddit", "target": "npc_name" or "subreddit_name"}
 If they didn't, return {"navigate": false}
-Reply ONLY with valid JSON.`;
+Reply ONLY with valid JSON. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use ```json or ```. Write the JSON directly in plain text!`;
         const usr = `Recent narrative:\n${combinedNarrative}\n\nDid the roleplay just show the player navigating their phone? Return JSON.`;
 
         const raw = await sendPhoneRequest(sys, usr);
