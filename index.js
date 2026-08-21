@@ -1881,7 +1881,18 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
                 const myName = `u/${(pcName || 'Player').toLowerCase().replace(/[^a-z0-9]/g, '')}`;
                 const history = ps.phoneRedditDMs[user].map(m => `${m.direction === 'out' ? myName : user}: ${m.text}`).join('\n');
                 const sceneCtx = _buildSceneContext(1000);
-                const sys = `You are roleplaying as Reddit user ${user} in a private DM chat. You are a stranger on the internet. Keep it realistic to Reddit chat culture. Reply ONLY with your message text.`;
+                
+                const profile = ps.phoneCache[`reddit_user_${user}`];
+                let profileCtx = '';
+                if (profile) {
+                    profileCtx = `\n\nYour Profile Info:\nBio: ${profile.bio || 'None'}\nVisual/Vibe: ${profile.visualProfile || 'None'}`;
+                    if (profile.recentPosts && profile.recentPosts.length) {
+                        const postsList = profile.recentPosts.slice(0, 5).map(p => `- [${p.sub || 'unknown'}] ${p.title || 'untitled'}`).join('\n');
+                        profileCtx += `\nYour Recent Posts:\n${postsList}`;
+                    }
+                }
+
+                const sys = `You are roleplaying as Reddit user ${user} in a private DM chat. You are a stranger on the internet. Keep it realistic to Reddit chat culture.${profileCtx}\n\nReply ONLY with your message text.`;
                 const usr = `${sceneCtx}\n\nChat History:\n${history}\n\n${user} replies:`;
                 const reply = (await sendPhoneRequest(sys, usr)).trim();
 
