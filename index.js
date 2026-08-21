@@ -54,6 +54,11 @@ const DEFAULTS = {
     phoneMode: false,
     profileVisualPrompt: 'Detailed physical description (body type, size, eye color, facial shape, hair style, hair colors, glasses, makeup, clothing style)',
     experimentalAutoNavigate: false,
+    laptopModeEnabled: true,
+    phoneWidth: 360,
+    phoneHeight: 640,
+    laptopWidth: 1000,
+    laptopHeight: 800,
 };
 
 function getSettings() {
@@ -358,7 +363,7 @@ function buildPhoneContextBlock() {
         const ps = getPhoneState();
         if (!ps) return '';
 
-        let prefix = 'CRITICAL INSTRUCTION: If the narrative mentions the player put down their phone after X minutes, use the [PHONE_ACTIVITY] block below to summarize what they were just doing on it.\n';
+        let prefix = 'CRITICAL INSTRUCTION: If the narrative mentions the player put down their phone or closed their computer after X minutes, use the [PHONE/COMPUTER_ACTIVITY] block below to summarize what they were just doing on it.\n';
 
         const depth = Math.max(1, s.contextDepth || 20);
         const recent = ps.phoneHistory.slice(-depth);
@@ -375,7 +380,7 @@ function buildPhoneContextBlock() {
         if (ps.phoneUnread.calls    > 0) unreadParts.push(`${ps.phoneUnread.calls} missed call${ps.phoneUnread.calls > 1 ? 's' : ''}`);
         const unreadNote = unreadParts.length ? `\nPending: ${unreadParts.join(', ')}` : '';
 
-        return `${prefix}[PHONE_ACTIVITY]\n${lines.join('\n')}${unreadNote}\n[/PHONE_ACTIVITY]`;
+        return `${prefix}[PHONE/COMPUTER_ACTIVITY]\n${lines.join('\n')}${unreadNote}\n[/PHONE/COMPUTER_ACTIVITY]`;
     } catch (e) {
         console.warn('[SillyPhone] buildPhoneContextBlock failed:', e);
         return '';
@@ -649,11 +654,38 @@ function openPhone() {
     _phoneSessionStartTime = Date.now();
     _phoneActiveTimeMs = 0;
     _phoneLastActivityTime = Date.now();
+    
+    const s = getSettings();
+    if (globalThis._rpgLaptopMode) {
+        _phoneEl.dataset.device = 'laptop';
+        _phoneEl.style.width = (s.laptopWidth || 1000) + 'px';
+        _phoneEl.style.height = (s.laptopHeight || 800) + 'px';
+        _phoneEl.querySelector('.rpg-phone-shell').style.width = '100%';
+        _phoneEl.querySelector('.rpg-phone-shell').style.height = '100%';
+    } else {
+        delete _phoneEl.dataset.device;
+        if (s.phoneMode) {
+            _phoneEl.style.width = '300px';
+            _phoneEl.style.height = '500px';
+            _phoneEl.querySelector('.rpg-phone-shell').style.width = '300px';
+            _phoneEl.querySelector('.rpg-phone-shell').style.height = '500px';
+        } else {
+            _phoneEl.style.width = (s.phoneWidth || 360) + 'px';
+            _phoneEl.style.height = (s.phoneHeight || 640) + 'px';
+            _phoneEl.querySelector('.rpg-phone-shell').style.width = (s.phoneWidth || 360) + 'px';
+            _phoneEl.querySelector('.rpg-phone-shell').style.height = (s.phoneHeight || 640) + 'px';
+        }
+    }
+    
     _phoneEl.style.display = 'flex';
     _applyGenreSkin();
     _restorePanelPosition();
     _updateStatusBar();
     _navigateHome();
+    
+    // Update put down button text
+    const btn = _phoneEl.querySelector('#rpg_phone_putdown_btn');
+    if (btn) btn.innerHTML = globalThis._rpgLaptopMode ? '💻 Close computer' : '📱 Put down phone';
 }
 
 function closePhone() {
@@ -762,7 +794,9 @@ function _buildPhonePanel() {
         if (s.autoPutDownMessage !== false) {
             _recordPhoneActivity(); // ensure final time is captured
             const minutes = Math.max(1, Math.round(_phoneActiveTimeMs / 60000));
-            const msg = `You put down the phone after using it for ${minutes} minute${minutes > 1 ? 's' : ''}.`;
+            const deviceName = globalThis._rpgLaptopMode ? 'computer' : 'phone';
+            const action = globalThis._rpgLaptopMode ? 'closed' : 'put down';
+            const msg = `You ${action} the ${deviceName} after using it for ${minutes} minute${minutes > 1 ? 's' : ''}.`;
             if (s.putDownMessageToTextbox) {
                 const ta = document.getElementById('send_textarea');
                 if (ta) {
@@ -823,6 +857,7 @@ function _phoneShellHTML() {
   <div class="rpg-phone-navbar" id="rpg_phone_navbar">
     <button class="rpg-phone-nav-btn" id="rpg_phone_back_btn" title="Back">‹</button>
     <span class="rpg-phone-nav-title" id="rpg_phone_nav_title"></span>
+    <button class="rpg-phone-nav-btn" id="rpg_phone_batch_gen_btn" title="Batch Generate Images" style="display:none;font-size:16px;padding-top:2px">🎨</button>
     <button class="rpg-phone-nav-btn" id="rpg_phone_refresh_btn" title="Refresh" style="display:none;font-size:16px;padding-top:2px">↻</button>
     <button class="rpg-phone-nav-btn rpg-phone-close-btn" id="rpg_phone_close_btn" title="Close phone">✕</button>
   </div>
@@ -1071,8 +1106,8 @@ function _showPhoneImageViewerPopup(src, desc, onEdit, onRegenerate) {
     const overlay = document.createElement('div');
     overlay.className = 'rpg-phone-popup-overlay';
     overlay.innerHTML = `
-        <div class="rpg-phone-popup" style="font-family: system-ui, -apple-system, sans-serif; text-align:center;">
-            <img src="${_escHtml(src)}" style="max-width:100%;max-height:60vh;border-radius:8px;margin-bottom:16px;" />
+        <div class="rpg-phone-popup" style="font-family: system-ui, -apple-system, sans-serif; text-align:center; width: auto; max-width: 95vw; max-height: 95vh; overflow: auto;">
+            <img src="${_escHtml(src)}" style="border-radius:8px;margin-bottom:16px;display:block;margin-left:auto;margin-right:auto;" />
             <div style="display:flex;gap:8px;justify-content:center;">
                 <button class="rpg-phone-reddit-btn primary" id="rph_img_view_regen" style="flex:1;justify-content:center;padding:8px;">Regenerate</button>
                 <button class="rpg-phone-reddit-btn" id="rph_img_view_edit" style="flex:1;justify-content:center;padding:8px;">Edit Prompt</button>
@@ -1198,6 +1233,34 @@ function _bindPhoneImages(screen) {
         const desc = el.dataset.imgPrompt;
         if (desc) bindViewer(el, desc, el.src);
     });
+
+    // Batch generate logic
+    const placeholders = Array.from(screen.querySelectorAll('.rpg-phone-image-placeholder:not([data-generating="true"])'));
+    const batchBtn = _phoneEl?.querySelector('#rpg_phone_batch_gen_btn');
+    if (batchBtn) {
+        if (placeholders.length > 0) {
+            batchBtn.style.display = 'block';
+            batchBtn.onclick = async () => {
+                if (batchBtn.dataset.busy === 'true') return;
+                batchBtn.dataset.busy = 'true';
+                batchBtn.style.opacity = '0.5';
+                for (const el of placeholders) {
+                    if (!el.isConnected || el.dataset.generating === 'true') continue;
+                    const desc = el.dataset.imgPrompt;
+                    if (!desc) continue;
+                    const s = getSettings();
+                    const cmd = s.imageGenCommand || '/imagine quiet=true "{{prompt}}"';
+                    await _handleImageResult({ type: 'generate', desc: desc, cmd: cmd }, el, desc);
+                }
+                batchBtn.dataset.busy = 'false';
+                batchBtn.style.opacity = '1';
+                batchBtn.style.display = 'none';
+            };
+        } else {
+            batchBtn.style.display = 'none';
+            batchBtn.onclick = null;
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1363,6 +1426,7 @@ async function _renderRedditApp(pageId, params, screen) {
             btn.addEventListener('click', () => {
                 const tab = btn.dataset.tab;
                 if (tab === 'foryou') _navigateTo('reddit', 'home');
+                else if (tab === 'feed') _navigateTo('reddit', 'feed');
                 else if (tab === 'discover') _navigateTo('reddit', 'discover');
                 else if (tab === 'joined') _navigateTo('reddit', 'joined_subs');
                 else if (tab === 'dms') _navigateTo('reddit', 'dm_list');
@@ -1438,6 +1502,62 @@ async function _renderRedditApp(pageId, params, screen) {
             renderList(subs);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('home', params, screen); });
         } catch (e) { screen.innerHTML = `${renderTabs('foryou')}<div class="rpg-phone-error">Reddit unavailable: ${_escHtml(e.message)}</div>`; bindTabs(); }
+        return;
+    }
+
+    if (pageId === 'feed') {
+        _logPhoneActivity('reddit', 'Reddit', 'out', 'Opened Reddit Feed');
+        const cacheKey = 'reddit_posts_feed';
+        const renderList = (posts) => {
+            _renderRedditFeed(screen, 'Your Feed', posts);
+            const header = screen.querySelector('.rpg-phone-reddit-sub-header');
+            if (header) {
+                header.insertAdjacentHTML('afterbegin', renderTabs('feed'));
+            }
+        };
+
+        if (ps.phoneCache[cacheKey]) {
+            renderList(ps.phoneCache[cacheKey]);
+            _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('feed', params, screen); });
+            return;
+        }
+
+        const sceneCtx = _buildSceneContext(1000);
+        
+        // Build context of what the user is subscribed to
+        const joined = (ps.phoneRedditJoinedSubs || []).map(s => `${s.name}: ${s.description}`).join(' | ');
+        const following = (ps.phoneRedditFollowing || []).map(u => {
+            const prof = ps.phoneCache[`reddit_user_${u}`];
+            return `${u} (Bio: ${prof?.bio||''}, Visual: ${prof?.visualProfile||''})`;
+        }).join(' | ');
+        
+        const sys = `You generate a highly personalized Reddit timeline for a user. You must generate 6 posts total.
+The posts should be a mix of:
+1. Posts from subreddits they joined (specify the subreddit in 'sub').
+2. Posts from users they follow (specify the user in 'author', and their sub).
+3. "You might like" or "Discover" posts from NEW subreddits they HAVEN'T joined yet, based on their interests.
+
+Joined Subs: ${joined || 'None'}
+Followed Users: ${following || 'None'}
+
+Output a JSON array of posts. Format: [{"sub":"r/name", "author":"u/name", "title":"...", "preview":"...", "upvotes": 123, "comments": 12, "imagePrompt":"optional detailed visual description"}]
+CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json or \`\`\`. Write the JSON directly in plain text!`;
+        const usr = `${sceneCtx}\n\nGenerate the personalized feed timeline JSON.`;
+        
+        screen.innerHTML = `${renderTabs('feed')}<div style="padding:20px;text-align:center;">Loading Feed...</div>`;
+        bindTabs();
+        
+        try {
+            const raw  = await sendPhoneRequest(sys, usr);
+            const match = raw.match(/\[[\s\S]*\]/);
+            const posts  = match ? JSON.parse(match[0]) : [];
+            ps.phoneCache[cacheKey] = posts; savePhoneState();
+            renderList(posts);
+            _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('feed', params, screen); });
+        } catch (e) { 
+            screen.innerHTML = `${renderTabs('feed')}<div class="rpg-phone-error">Feed unavailable: ${_escHtml(e.message)}</div>`; 
+            bindTabs(); 
+        }
         return;
     }
 
@@ -2027,9 +2147,22 @@ function _renderRedditSubList(screen, subs, tabsHtml = '', config = {}) {
 function _renderRedditFeed(screen, sub, posts) {
     const ps = getPhoneState();
     const postsHTML = posts.map((p, i) => {
-        const isSaved = ps.phoneRedditSavedPosts.some(sp => sp.title === p.title && sp.sub === sub);
+        const actualSub = p.sub || sub;
+        const isSaved = ps.phoneRedditSavedPosts.some(sp => sp.title === p.title && sp.sub === actualSub);
+        const isJoined = ps.phoneRedditJoinedSubs.some(js => js.name === actualSub);
+        
+        let subHeaderHtml = '';
+        if (actualSub && actualSub !== sub && actualSub.startsWith('r/')) {
+            subHeaderHtml = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+              <span style="font-weight:bold; color:#ff6314; cursor:pointer;" class="rpg-phone-reddit-sub-link" data-sub="${_escHtml(actualSub)}">${_escHtml(actualSub)}</span>
+              <button class="rpg-phone-reddit-btn rpg-phone-reddit-sub-quickjoin ${isJoined ? '' : 'primary'}" data-sub="${_escHtml(actualSub)}" style="padding: 2px 8px; font-size: 11px;">${isJoined ? 'Joined' : 'Join'}</button>
+            </div>`;
+        }
+        
         return `
 <div class="rpg-phone-reddit-post" data-idx="${i}" data-post-json="${_escHtml(JSON.stringify(p))}">
+  ${subHeaderHtml}
   ${p.flair ? `<span class="rpg-phone-reddit-flair">${_escHtml(p.flair)}</span>` : ''}
   <div class="rpg-phone-reddit-post-title">${_escHtml(p.title || '')}</div>
   <div class="rpg-phone-reddit-post-meta" style="display:flex; justify-content:space-between; align-items:center;">
@@ -2038,35 +2171,65 @@ function _renderRedditFeed(screen, sub, posts) {
       <span style="margin-left:8px">💬 ${p.comments || 0}</span>
       <span class="rpg-phone-reddit-user-link" style="margin-left:8px">${_escHtml(p.author || '')}</span>
     </div>
-    <span class="rpg-phone-reddit-save-btn" data-idx="${i}" style="cursor:pointer; font-size:16px;">${isSaved ? '🔖' : '📑'}</span>
+    <span class="rpg-phone-reddit-save-btn" data-idx="${i}" style="cursor:pointer; font-size:16px;">${isSaved ? '🔖' : '🏷️'}</span>
   </div>
   ${p.imagePrompt ? `<div style="margin-top:8px;">${_parsePhoneImages(`[IMAGE: ${p.imagePrompt}]`)}</div>` : ''}
   ${p.preview ? `<div class="rpg-phone-reddit-post-preview">${_escHtml(p.preview)}</div>` : ''}
 </div>`;
     }).join('');
+    
     screen.innerHTML = `<div class="rpg-phone-reddit-sub-header">${_escHtml(sub)}</div>${postsHTML}`;
     _bindRedditUserLinks(screen);
+    
+    screen.querySelectorAll('.rpg-phone-reddit-sub-link').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            _navigateTo('reddit', 'sub', { sub: el.dataset.sub });
+        });
+    });
+    
+    screen.querySelectorAll('.rpg-phone-reddit-sub-quickjoin').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const subName = btn.dataset.sub;
+            const existingIdx = ps.phoneRedditJoinedSubs.findIndex(s => s.name === subName);
+            if (existingIdx >= 0) {
+                ps.phoneRedditJoinedSubs.splice(existingIdx, 1);
+                btn.textContent = 'Join';
+                btn.classList.add('primary');
+            } else {
+                ps.phoneRedditJoinedSubs.push({ name: subName, icon: '🤖', description: '' });
+                btn.textContent = 'Joined';
+                btn.classList.remove('primary');
+            }
+            savePhoneState();
+        });
+    });
+
     screen.querySelectorAll('.rpg-phone-reddit-save-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const idx = parseInt(btn.dataset.idx, 10);
             const p = posts[idx];
-            p.sub = sub;
-            const existingIdx = ps.phoneRedditSavedPosts.findIndex(sp => sp.title === p.title && sp.sub === sub);
-            if (existingIdx >= 0) ps.phoneRedditSavedPosts.splice(existingIdx, 1);
-            else ps.phoneRedditSavedPosts.push(p);
+            const actualSub = p.sub || sub;
+            const savedIdx = ps.phoneRedditSavedPosts.findIndex(sp => sp.title === p.title && sp.sub === actualSub);
+            if (savedIdx >= 0) {
+                ps.phoneRedditSavedPosts.splice(savedIdx, 1);
+                btn.textContent = '🏷️';
+            } else {
+                ps.phoneRedditSavedPosts.push({ ...p, sub: actualSub });
+                btn.textContent = '🔖';
+            }
             savePhoneState();
-            btn.textContent = existingIdx >= 0 ? '📑' : '🔖';
         });
     });
     screen.querySelectorAll('.rpg-phone-reddit-post').forEach(el => {
         el.addEventListener('click', () => {
             const idx = parseInt(el.dataset.idx, 10);
-            _logPhoneActivity('reddit', sub, 'in', `Opened post: "${_summarizeText(posts[idx]?.title, 60)}"`);
-            _navigateTo('reddit', 'post', { sub, post: posts[idx] });
+            const actualSub = posts[idx].sub || sub;
+            _navigateTo('reddit', 'post', { sub: actualSub, post: posts[idx] });
         });
     });
-    _bindPhoneImages(screen);
 }
 
 function _renderRedditPost(screen, post, sub, data) {
@@ -3044,6 +3207,20 @@ function _renderPhoneSettingsApp(pageId, params, screen) {
 <div class="rpg-phone-settings-app">
   <h3>SillyPhone Settings</h3>
   <label class="rpg-phone-settings-row">
+    <span>Phone Panel Size</span>
+    <div style="display:flex;gap:4px">
+      <input type="number" id="rpg_phone_width" class="rpg-phone-input-small" style="width:60px" placeholder="W" value="${s.phoneWidth || 360}"/> x 
+      <input type="number" id="rpg_phone_height" class="rpg-phone-input-small" style="width:60px" placeholder="H" value="${s.phoneHeight || 640}"/>
+    </div>
+  </label>
+  <label class="rpg-phone-settings-row">
+    <span>Laptop Panel Size</span>
+    <div style="display:flex;gap:4px">
+      <input type="number" id="rpg_laptop_width" class="rpg-phone-input-small" style="width:60px" placeholder="W" value="${s.laptopWidth || 1000}"/> x 
+      <input type="number" id="rpg_laptop_height" class="rpg-phone-input-small" style="width:60px" placeholder="H" value="${s.laptopHeight || 800}"/>
+    </div>
+  </label>
+  <label class="rpg-phone-settings-row">
     <span>Include active card & world context in AI prompts</span>
     <input type="checkbox" id="rpg_phone_card_ctx_toggle" ${s.includeCardContext !== false ? 'checked' : ''}/>
   </label>
@@ -3238,49 +3415,64 @@ function _bindSettingsPanel() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function _buildFAB() {
-    if (document.getElementById('sillyphone-fab')) return;
+    if (document.getElementById('sillyphone-fab-container')) return;
 
-    const fab = document.createElement('button');
-    fab.id = 'sillyphone-fab';
-    fab.title = 'SillyPhone';
-    fab.innerHTML = `📱<span id="sillyphone-fab-badge"></span>`;
-    fab.style.touchAction = 'none'; // prevent mobile browser from hijacking touch for scroll
-    document.body.appendChild(fab);
-
-    // Restore saved position
     const s = getSettings();
+    const container = document.createElement('div');
+    container.id = 'sillyphone-fab-container';
+    container.style.touchAction = 'none';
+    
+    // Default position or restored
     if (s.fabX && s.fabY) {
-        fab.style.position = 'fixed';
-        fab.style.left   = s.fabX;
-        fab.style.top    = s.fabY;
-        fab.style.bottom = 'auto';
-        fab.style.right  = 'auto';
-        fab.style.transform = 'none';
+        container.style.left   = s.fabX;
+        container.style.top    = s.fabY;
+        container.style.bottom = 'auto';
+        container.style.right  = 'auto';
     } else if (s.phoneMode) {
-        fab.style.position = 'fixed';
-        fab.style.left = 'calc(50% - 28px)';
-        fab.style.top = 'calc(50% - 28px)';
-        fab.style.bottom = 'auto';
-        fab.style.right = 'auto';
-        fab.style.transform = 'none';
+        container.style.left = 'calc(50% - 28px)';
+        container.style.top = 'calc(50% - 28px)';
     } else {
-        fab.style.transform = 'none';
+        container.style.bottom = '20px';
+        container.style.right = '20px';
     }
 
-    // Toggle on click — _makeDraggable tells us if it was a real drag via the 3rd arg
-    _makeDraggable(fab, fab, (left, top, wasDragged) => {
+    const fabLaptop = document.createElement('button');
+    fabLaptop.className = 'sillyphone-fab-btn';
+    fabLaptop.title = 'SillyLaptop';
+    fabLaptop.innerHTML = `💻`;
+    
+    const fabPhone = document.createElement('button');
+    fabPhone.className = 'sillyphone-fab-btn';
+    fabPhone.title = 'SillyPhone';
+    fabPhone.innerHTML = `📱<span id="sillyphone-fab-badge"></span>`;
+
+    if (s.laptopModeEnabled !== false) {
+        container.appendChild(fabLaptop);
+    }
+    container.appendChild(fabPhone);
+    document.body.appendChild(container);
+
+    _makeDraggable(container, container, (left, top, wasDragged) => {
         if (wasDragged) {
-            // Only save position on a real drag
             const s2 = getSettings();
             s2.fabX = left; s2.fabY = top;
             saveSettings();
-        } else {
-            // It was a click — open/close the phone
-            togglePhone();
         }
     });
 
-    if (!s.enabled) fab.style.display = 'none';
+    fabPhone.addEventListener('click', (e) => {
+        e.stopPropagation();
+        globalThis._rpgLaptopMode = false;
+        togglePhone();
+    });
+    
+    fabLaptop.addEventListener('click', (e) => {
+        e.stopPropagation();
+        globalThis._rpgLaptopMode = true;
+        togglePhone();
+    });
+
+    if (!s.enabled) container.style.display = 'none';
     _updateNotificationBadge();
 }
 
@@ -3367,7 +3559,7 @@ function _hookEvents() {
         _updateNotificationBadge();
     });
 
-    // Inject [PHONE_ACTIVITY] into context before generation
+    // Inject [PHONE/COMPUTER_ACTIVITY] into context before generation
     // We use a message sent event to piggyback the context block into the prompt
     // (ST doesn't have a direct pre-generation hook in extensions, so we inject
     //  via the extensionPrompt API if available, or via a chat message formatter)

@@ -1,5 +1,21 @@
 # SillyPhone Changelog
 
+## [1.4.0] - Laptop Mode, Reddit Feed, & Stability Fixes
+
+### ✨ New Features
+- **Laptop / Computer Mode (Major)**: A brand new mode accessible via a secondary Laptop icon on your screen. Opens the interface in a wider, desktop-style layout with multi-column views. Completely syncs 1:1 with your phone state, and changes context logging to reflect computer usage.
+- **Reddit Feed Tab (Major)**: A new 'Feed' tab in the Reddit app that generates a unified timeline of posts from your joined subreddits, followed users, and algorithmic 'You might like' / 'Discover' suggestions.
+- **Batch Image Generation**: Added a new button to batch generate all unloaded image placeholders on the current screen sequentially.
+- **Full-Size Image Viewer**: The image popup viewer now scales to the image's raw size instead of shrinking it, allowing you to pan/scroll around full-resolution generations.
+- **Resizable Panels**: Added new settings to independently configure the width and height of both the Phone panel and the Laptop panel.
+- **Quick Join Subreddits**: Added inline 'Join' / 'Joined' buttons to all subreddit lists (For You, Discover, Search, Joined) allowing you to toggle subscriptions without opening the subreddit.
+
+### 🐛 Bug Fixes
+- **Robust JSON Parsing**: Hardened all AI prompts to explicitly forbid markdown code blocks, preventing fatal parsing errors on models that stubbornly wrap JSON in \\json.
+- **Fix Disappearing Images**: Fixed a bug where generated images would disappear after refreshing SillyTavern due to ephemeral Blob URLs. Images are now converted to persistent Base64 automatically.
+- **Fix Reddit Infinite Loading**: Fixed a variable shadowing bug (\ReferenceError\) that caused Reddit posts to hang infinitely when clicked.
+- **Fix Reddit DM Context**: Fixed an issue where the AI had no context of the Reddit user's profile when you DM'd them. DMs now correctly inject their cached bio, visual profile, and recent posts into the system prompt.
+
 ## [1.3.0] - Automated Navigation & Persistent Visuals
 
 ### ✨ New Features

@@ -454,3 +454,60 @@
     display: flex;
     flex-direction: column;
 }
+
+#sillyphone-fab-container {
+    position: fixed;
+    z-index: 99998;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.sillyphone-fab-btn {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6c63ff, #4a43e0);
+    border: none;
+    color: #fff;
+    font-size: 26px;
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 24px rgba(108,99,255,0.55), 0 2px 8px rgba(0,0,0,0.4);
+    transition: box-shadow 0.15s;
+    user-select: none;
+    position: relative;
+}
+.sillyphone-fab-btn:hover { box-shadow: 0 8px 28px rgba(108,99,255,0.7), 0 3px 10px rgba(0,0,0,0.5); }
+.sillyphone-fab-btn:active { cursor: grabbing; }
+
+/* Laptop Mode overrides */
+.rpg-phone[data-device="laptop"] {
+    width: 80vw !important;
+    height: 80vh !important;
+    max-width: 1200px !important;
+    max-height: 900px !important;
+    border-radius: 12px;
+}
+.rpg-phone[data-device="laptop"] .rpg-phone-shell {
+    border-radius: 12px;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.05);
+}
+.rpg-phone[data-device="laptop"] .rpg-phone-screen {
+    font-size: 110%; /* bigger text */
+}
+
+/* Reddit Desktop Layout */
+.rpg-phone[data-device="laptop"] .rpg-phone-reddit-tabs {
+    flex-direction: row;
+    justify-content: flex-start;
+}
+.rpg-phone[data-device="laptop"] .rpg-phone-reddit-post-body {
+    max-height: 400px; /* longer text before cutoff */
+}
+
+/* Messages Desktop Layout */
+.rpg-phone[data-device="laptop"] .rpg-phone-sms-bubble {
+    max-width: 60%;
+}
