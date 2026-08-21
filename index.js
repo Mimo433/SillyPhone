@@ -292,7 +292,7 @@ function _logPhoneActivity(type, contact, direction, summary) {
         const ps = getPhoneState();
         if (!ps) return;
         if (!Array.isArray(ps.phoneHistory)) ps.phoneHistory = [];
-        const cleanSummary = _summarizeText(summary, 280);
+        const cleanSummary = _summarizeText(summary, 1000);
         if (!cleanSummary) return;
         // Deduplicate within 4 seconds
         const last = ps.phoneHistory[ps.phoneHistory.length - 1];
@@ -1103,6 +1103,7 @@ function _showPhoneImagePopup(desc, onResult) {
 }
 
 function _showPhoneImageViewerPopup(src, desc, onEdit, onRegenerate) {
+    _logPhoneActivity('image', 'Image', 'in', 'Viewed full-size image: ' + _summarizeText(desc || 'photo', 50));
     const overlay = document.createElement('div');
     overlay.className = 'rpg-phone-popup-overlay';
     overlay.innerHTML = `
@@ -1562,6 +1563,7 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
     }
 
     if (pageId === 'discover') {
+        _logPhoneActivity('reddit', 'Reddit', 'out', 'Opened Reddit Discover');
         const cacheKey = 'reddit_subs_discover';
         const renderList = (subs) => {
             _renderRedditSubList(screen, subs, renderTabs('discover'), {
@@ -1609,6 +1611,7 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
 
     if (pageId === 'search') {
         const query = params.query;
+        _logPhoneActivity('reddit', 'Reddit', 'out', 'Searched Reddit for: ' + query);
         const cacheKey = `reddit_subs_search_${query}`;
         const renderList = (subs) => {
             _renderRedditSubList(screen, subs, renderTabs(''), {
@@ -1656,6 +1659,7 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
 
     if (pageId === 'saved') {
         _setNavTitle('Saved Posts');
+        _logPhoneActivity('reddit', 'Reddit', 'out', 'Opened Reddit Saved Posts');
         const saved = ps.phoneRedditSavedPosts || [];
         const items = saved.length === 0 ? '<p class="rpg-phone-muted" style="padding:12px;text-align:center;">No saved posts yet.</p>' : '';
         screen.innerHTML = `${renderTabs('saved')}<div>${items}</div>`;
@@ -1681,6 +1685,7 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
 
     if (pageId === 'joined_subs') {
         _setNavTitle('Joined');
+        _logPhoneActivity('reddit', 'Reddit', 'out', 'Opened Reddit Joined Subs');
         const joined = ps.phoneRedditJoinedSubs || [];
         const items = joined.map((s, i) => `
 <div class="rpg-phone-reddit-sub" data-idx="${i}" style="justify-content: space-between;">
@@ -1881,6 +1886,7 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
         const user = params.user;
         const s = getSettings();
         _setNavTitle(user);
+        _logPhoneActivity('reddit', user, 'in', 'Viewed profile of user: ' + user);
         const cacheKey = `reddit_user_${user}`;
         
         const renderProfile = (data) => {
@@ -1906,8 +1912,13 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
 </div>
 <div>${postsHtml}</div>`;
             document.getElementById('rph_follow_user')?.addEventListener('click', () => {
-                if (isFollowing) ps.phoneRedditFollowing = ps.phoneRedditFollowing.filter(u => u !== user);
-                else ps.phoneRedditFollowing.push(user);
+                if (isFollowing) {
+                    ps.phoneRedditFollowing = ps.phoneRedditFollowing.filter(u => u !== user);
+                    _logPhoneActivity('reddit', user, 'out', 'Unfollowed user: ' + user);
+                } else {
+                    ps.phoneRedditFollowing.push(user);
+                    _logPhoneActivity('reddit', user, 'out', 'Followed user: ' + user);
+                }
                 savePhoneState();
                 _renderRedditApp('profile', params, screen);
             });
@@ -1967,6 +1978,7 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
 
     if (pageId === 'dm_list') {
         _setNavTitle('Chats');
+        _logPhoneActivity('reddit', 'Chats', 'out', 'Opened Reddit DMs');
         const dms = Object.entries(ps.phoneRedditDMs || {}).filter(([, msgs]) => msgs.length > 0);
         const rows = dms.map(([user, msgs]) => `
 <div class="rpg-phone-reddit-dm-row" data-user="${_escHtml(user)}">
@@ -1987,6 +1999,7 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
     if (pageId === 'dm_thread') {
         const user = params.user;
         _setNavTitle(user);
+        _logPhoneActivity('reddit', user, 'out', 'Opened Reddit DM thread with ' + user);
         const msgs = ps.phoneRedditDMs[user] || [];
         const bubblesHTML = msgs.map(m => `
 <div class="rpg-phone-sms-bubble ${m.direction === 'out' ? 'rpg-phone-sms-out' : 'rpg-phone-sms-in'}">
@@ -2021,6 +2034,7 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
             if (!ps.phoneRedditDMs[user]) ps.phoneRedditDMs[user] = [];
             ps.phoneRedditDMs[user].push({ text, direction: 'out' });
             savePhoneState();
+            _logPhoneActivity('reddit', user, 'out', text);
 
             try {
                 const { pcName } = _getPlayerCharacterInfo();
@@ -2044,6 +2058,7 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
 
                 ps.phoneRedditDMs[user].push({ text: reply, direction: 'in' });
                 savePhoneState();
+                _logPhoneActivity('reddit', user, 'in', reply);
                 
                 const inBubble = document.createElement('div');
                 inBubble.className = 'rpg-phone-sms-bubble rpg-phone-sms-in';
@@ -2119,10 +2134,12 @@ function _renderRedditSubList(screen, subs, tabsHtml = '', config = {}) {
                 ps.phoneRedditJoinedSubs.splice(existingIdx, 1);
                 btn.textContent = 'Join';
                 btn.classList.add('primary');
+                _logPhoneActivity('reddit', sub.name, 'out', 'Left subreddit: ' + sub.name);
             } else {
                 ps.phoneRedditJoinedSubs.push(sub);
                 btn.textContent = 'Joined';
                 btn.classList.remove('primary');
+                _logPhoneActivity('reddit', sub.name, 'out', 'Joined subreddit: ' + sub.name);
             }
             savePhoneState();
         });
@@ -2197,10 +2214,12 @@ function _renderRedditFeed(screen, sub, posts) {
                 ps.phoneRedditJoinedSubs.splice(existingIdx, 1);
                 btn.textContent = 'Join';
                 btn.classList.add('primary');
+                _logPhoneActivity('reddit', subName, 'out', 'Left subreddit: ' + subName);
             } else {
                 ps.phoneRedditJoinedSubs.push({ name: subName, icon: '🤖', description: '' });
                 btn.textContent = 'Joined';
                 btn.classList.remove('primary');
+                _logPhoneActivity('reddit', subName, 'out', 'Joined subreddit: ' + subName);
             }
             savePhoneState();
         });
@@ -2216,9 +2235,11 @@ function _renderRedditFeed(screen, sub, posts) {
             if (savedIdx >= 0) {
                 ps.phoneRedditSavedPosts.splice(savedIdx, 1);
                 btn.textContent = '🏷️';
+                _logPhoneActivity('reddit', actualSub, 'out', `Unsaved post: "${_summarizeText(p.title, 50)}"`);
             } else {
                 ps.phoneRedditSavedPosts.push({ ...p, sub: actualSub });
                 btn.textContent = '🔖';
+                _logPhoneActivity('reddit', actualSub, 'out', `Saved post: "${_summarizeText(p.title, 50)}"`);
             }
             savePhoneState();
         });
@@ -2359,6 +2380,7 @@ function _renderRedditPost(screen, post, sub, data) {
         const cacheKey = `reddit_post_${sub}_${encodeURIComponent(post.title || '')}`;
         ps.phoneCache[cacheKey] = data;
         savePhoneState();
+        _logPhoneActivity('reddit', sub, 'out', 'Commented on post: "' + text + '"');
         _renderRedditPost(screen, post, sub, data);
 
         // Trigger AI to generate a reply
@@ -3201,6 +3223,7 @@ ${imgHTML}
 
 function _renderPhoneSettingsApp(pageId, params, screen) {
     _setNavTitle('Settings');
+    _logPhoneActivity('app', 'Settings', 'out', 'Opened Phone Settings');
     const s = getSettings();
 
     screen.innerHTML = `
