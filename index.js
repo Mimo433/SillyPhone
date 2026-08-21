@@ -55,10 +55,8 @@ const DEFAULTS = {
     profileVisualPrompt: 'Detailed physical description (body type, size, eye color, facial shape, hair style, hair colors, glasses, makeup, clothing style)',
     experimentalAutoNavigate: false,
     laptopModeEnabled: true,
-    phoneWidth: 360,
-    phoneHeight: 640,
-    laptopWidth: 1000,
-    laptopHeight: 800,
+    phoneScale: 100,
+    laptopScale: 100,
 };
 
 function getSettings() {
@@ -656,25 +654,26 @@ function openPhone() {
     _phoneLastActivityTime = Date.now();
     
     const s = getSettings();
+    const shell = _phoneEl.querySelector('.rpg-phone-shell');
+    
+    // Clear previously hardcoded dimension overrides
+    _phoneEl.style.width = '';
+    _phoneEl.style.height = '';
+    shell.style.width = '';
+    shell.style.height = '';
+    _phoneEl.querySelector('.rpg-phone-screen').style.fontSize = '';
+
     if (globalThis._rpgLaptopMode) {
         _phoneEl.dataset.device = 'laptop';
-        _phoneEl.style.width = (s.laptopWidth || 1000) + 'px';
-        _phoneEl.style.height = (s.laptopHeight || 800) + 'px';
-        _phoneEl.querySelector('.rpg-phone-shell').style.width = '100%';
-        _phoneEl.querySelector('.rpg-phone-shell').style.height = '100%';
+        const ls = (s.laptopScale || 100) / 100;
+        shell.style.transform = `scale(${ls})`;
+        shell.style.transformOrigin = 'center center';
     } else {
         delete _phoneEl.dataset.device;
-        if (s.phoneMode) {
-            _phoneEl.style.width = '300px';
-            _phoneEl.style.height = '500px';
-            _phoneEl.querySelector('.rpg-phone-shell').style.width = '300px';
-            _phoneEl.querySelector('.rpg-phone-shell').style.height = '500px';
-        } else {
-            _phoneEl.style.width = (s.phoneWidth || 360) + 'px';
-            _phoneEl.style.height = (s.phoneHeight || 640) + 'px';
-            _phoneEl.querySelector('.rpg-phone-shell').style.width = (s.phoneWidth || 360) + 'px';
-            _phoneEl.querySelector('.rpg-phone-shell').style.height = (s.phoneHeight || 640) + 'px';
-        }
+        let ps = (s.phoneScale || 100) / 100;
+        if (s.phoneMode) ps *= 0.85; // Mobile layout support
+        shell.style.transform = `scale(${ps})`;
+        shell.style.transformOrigin = 'center center';
     }
     
     _phoneEl.style.display = 'flex';
@@ -3230,18 +3229,14 @@ function _renderPhoneSettingsApp(pageId, params, screen) {
 <div class="rpg-phone-settings-app">
   <h3>SillyPhone Settings</h3>
   <label class="rpg-phone-settings-row">
-    <span>Phone Panel Size</span>
-    <div style="display:flex;gap:4px">
-      <input type="number" id="rpg_phone_width" class="rpg-phone-input-small" style="width:60px" placeholder="W" value="${s.phoneWidth || 360}"/> x 
-      <input type="number" id="rpg_phone_height" class="rpg-phone-input-small" style="width:60px" placeholder="H" value="${s.phoneHeight || 640}"/>
-    </div>
+    <span style="flex:1">Phone Size (%)</span>
+    <input type="range" id="rpg_phone_scale" min="50" max="200" value="${s.phoneScale || 100}"/>
+    <span id="rpg_phone_scale_lbl" style="width:40px;text-align:right">${s.phoneScale || 100}%</span>
   </label>
   <label class="rpg-phone-settings-row">
-    <span>Laptop Panel Size</span>
-    <div style="display:flex;gap:4px">
-      <input type="number" id="rpg_laptop_width" class="rpg-phone-input-small" style="width:60px" placeholder="W" value="${s.laptopWidth || 1000}"/> x 
-      <input type="number" id="rpg_laptop_height" class="rpg-phone-input-small" style="width:60px" placeholder="H" value="${s.laptopHeight || 800}"/>
-    </div>
+    <span style="flex:1">Laptop Size (%)</span>
+    <input type="range" id="rpg_laptop_scale" min="50" max="200" value="${s.laptopScale || 100}"/>
+    <span id="rpg_laptop_scale_lbl" style="width:40px;text-align:right">${s.laptopScale || 100}%</span>
   </label>
   <label class="rpg-phone-settings-row">
     <span>Include active card & world context in AI prompts</span>
@@ -3281,6 +3276,25 @@ function _renderPhoneSettingsApp(pageId, params, screen) {
   <button class="rpg-phone-btn rpg-phone-btn-danger" id="rpg_phone_reset_all_btn">⚠️ Reset All Phone Data</button>
 </div>`;
 
+    
+    const inPhoneScale = document.getElementById('rpg_phone_scale');
+    const inPhoneLbl = document.getElementById('rpg_phone_scale_lbl');
+    inPhoneScale?.addEventListener('input', () => {
+        s.phoneScale = parseInt(inPhoneScale.value, 10);
+        if (inPhoneLbl) inPhoneLbl.textContent = `${s.phoneScale}%`;
+        saveSettings();
+        if (_isOpen && !globalThis._rpgLaptopMode) { _isOpen = false; openPhone(); }
+    });
+    
+    const inLaptopScale = document.getElementById('rpg_laptop_scale');
+    const inLaptopLbl = document.getElementById('rpg_laptop_scale_lbl');
+    inLaptopScale?.addEventListener('input', () => {
+        s.laptopScale = parseInt(inLaptopScale.value, 10);
+        if (inLaptopLbl) inLaptopLbl.textContent = `${s.laptopScale}%`;
+        saveSettings();
+        if (_isOpen && globalThis._rpgLaptopMode) { _isOpen = false; openPhone(); }
+    });
+    
     document.getElementById('rpg_phone_card_ctx_toggle')?.addEventListener('change', e => { s.includeCardContext = e.target.checked; saveSettings(); });
     document.getElementById('rpg_phone_multihog_toggle')?.addEventListener('change', e => { s.multihogMode = e.target.checked; saveSettings(); });
     document.getElementById('rpg_phone_autoputdown_toggle')?.addEventListener('change', e => { s.autoPutDownMessage = e.target.checked; saveSettings(); });
@@ -3334,6 +3348,16 @@ function _buildSettingsHTML() {
         </div>
         <div class="sillyphone-setting-row" style="margin-bottom:8px;">
           <label><input type="checkbox" id="sp_phone_mode_cb" ${s.phoneMode ? 'checked' : ''}/> Phone Mode (Mobile layout support)</label>
+        </div>
+        <div class="sillyphone-setting-row" style="margin-bottom:8px;">
+          <label style="flex:1">Phone Size (%)</label>
+          <input type="range" id="sp_phone_scale" min="50" max="200" value="${s.phoneScale || 100}"/>
+          <span id="sp_phone_scale_label">${s.phoneScale || 100}%</span>
+        </div>
+        <div class="sillyphone-setting-row" style="margin-bottom:8px;">
+          <label style="flex:1">Laptop Size (%)</label>
+          <input type="range" id="sp_laptop_scale" min="50" max="200" value="${s.laptopScale || 100}"/>
+          <span id="sp_laptop_scale_label">${s.laptopScale || 100}%</span>
         </div>
         <div class="sillyphone-setting-row" style="margin-bottom:8px;">
           <label><input type="checkbox" id="sp_auto_nav_cb" ${s.experimentalAutoNavigate ? 'checked' : ''}/> [Experimental] Auto-Navigate on Phone Action</label>
@@ -3423,6 +3447,23 @@ function _bindSettingsPanel() {
     document.getElementById('sp_img_cmd')?.addEventListener('change', e => { s.imageGenCommand = e.target.value; saveSettings(); });
     document.getElementById('sp_img_inst')?.addEventListener('change', e => { s.imagePromptInstruction = e.target.value; saveSettings(); });
     document.getElementById('sp_phone_mode_cb')?.addEventListener('change', e => { s.phoneMode = e.target.checked; saveSettings(); });
+    const psSlider = document.getElementById('sp_phone_scale');
+    const psLabel = document.getElementById('sp_phone_scale_label');
+    psSlider?.addEventListener('input', () => {
+        s.phoneScale = parseInt(psSlider.value, 10);
+        if (psLabel) psLabel.textContent = `${s.phoneScale}%`;
+        saveSettings();
+        if (_isOpen && !globalThis._rpgLaptopMode) { _isOpen = false; openPhone(); }
+    });
+    
+    const lsSlider = document.getElementById('sp_laptop_scale');
+    const lsLabel = document.getElementById('sp_laptop_scale_label');
+    lsSlider?.addEventListener('input', () => {
+        s.laptopScale = parseInt(lsSlider.value, 10);
+        if (lsLabel) lsLabel.textContent = `${s.laptopScale}%`;
+        saveSettings();
+        if (_isOpen && globalThis._rpgLaptopMode) { _isOpen = false; openPhone(); }
+    });
     document.getElementById('sp_auto_nav_cb')?.addEventListener('change', e => { s.experimentalAutoNavigate = e.target.checked; saveSettings(); });
     document.getElementById('sp_prof_vis_inst')?.addEventListener('change', e => { s.profileVisualPrompt = e.target.value; saveSettings(); });
     const ctxSlider = document.getElementById('sp_ctx_depth');
