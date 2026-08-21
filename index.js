@@ -1000,7 +1000,7 @@ function _renderHomeScreen() {
 function _parsePhoneImages(text) {
     if (!text) return '';
     const ps = getPhoneState();
-    return text.replace(/\[IMAGE:\s*(.*?)\]/gi, (match, desc) => {
+    return text.replace(/\[IMAGE:\s*([\s\S]*?)\]/gi, (match, desc) => {
         const cleanDesc = desc.trim();
         if (ps.phoneImageCache && ps.phoneImageCache[cleanDesc]) {
             return `<img class="rpg-phone-generated-image" data-img-prompt="${_escHtml(cleanDesc)}" src="${_escHtml(ps.phoneImageCache[cleanDesc])}" style="width:100%;border-radius:8px;cursor:pointer;display:block;margin-bottom:8px;" />`;
@@ -1138,18 +1138,30 @@ function _bindPhoneImages(screen) {
                     const cmd = result.cmd.replace('{{prompt}}', escapedPrompt);
                     const res = await ctx.executeSlashCommandsWithOptions(cmd);
                     if (res?.pipe) {
+                        let finalSrc = res.pipe;
+                        if (finalSrc.startsWith('blob:')) {
+                            try {
+                                const fetched = await fetch(finalSrc);
+                                const blob = await fetched.blob();
+                                finalSrc = await new Promise(r => {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => r(reader.result);
+                                    reader.readAsDataURL(blob);
+                                });
+                            } catch(e) { console.warn('[SillyPhone] Blob conversion failed', e); }
+                        }
                         const ps = getPhoneState();
                         if (!ps.phoneImageCache) ps.phoneImageCache = {};
-                        ps.phoneImageCache[desc] = res.pipe;
+                        ps.phoneImageCache[desc] = finalSrc;
                         savePhoneState();
                         
                         const img = document.createElement('img');
-                        img.src = res.pipe;
+                        img.src = finalSrc;
                         img.className = 'rpg-phone-generated-image';
                         img.dataset.imgPrompt = desc;
                         img.style.cssText = 'width:100%;border-radius:8px;cursor:pointer;display:block;margin-bottom:8px;';
                         wrapper.replaceWith(img);
-                        bindViewer(img, desc, res.pipe);
+                        bindViewer(img, desc, finalSrc);
                         return;
                     }
                 }
@@ -1691,7 +1703,7 @@ Generate 6 Reddit posts for ${sub}. Format: [{"title":"","flair":"","author":"u/
         const sceneCtx = _buildSceneContext(1000);
         const sys = `You write the body text and comments for a Reddit post in this story world. Reply ONLY valid JSON. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json or \`\`\`. Write the JSON directly in plain text!`;
         
-        const ps = getPhoneState();
+
         const authorProfile = post.author ? ps?.phoneCache?.[`reddit_user_${post.author}`] : null;
         const authorVisual = authorProfile?.visualProfile ? `\nAuthor Visual Profile (incorporate this into image prompts if the author is pictured): ${authorProfile.visualProfile}` : '';
 
