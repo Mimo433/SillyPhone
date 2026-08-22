@@ -1383,6 +1383,11 @@ function _renderPage(appId, pageId, params) {
     const screen = _getScreen();
     if (!screen) return;
     _setRefreshAction(null);
+    const batchBtn = _phoneEl?.querySelector('#rpg_phone_batch_gen_btn');
+    if (batchBtn) {
+        batchBtn.style.display = 'none';
+        batchBtn.onclick = null;
+    }
     screen.innerHTML = `<div class="rpg-phone-loading"><div class="rpg-phone-spinner"></div><p>Loading…</p></div>`;
     switch (appId) {
         case 'google':   return _renderGoogleApp(pageId, params, screen);
@@ -2361,6 +2366,8 @@ function _renderRedditFeed(screen, sub, posts) {
             _navigateTo('reddit', 'post', { sub: actualSub, post: posts[idx] });
         });
     });
+    
+    _bindPhoneImages(screen);
 }
 
 function _renderRedditPost(screen, post, sub, data) {
