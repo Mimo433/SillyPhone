@@ -1116,8 +1116,8 @@ function _renderHomeScreen() {
     const msgBadge  = unread.messages > 0 ? `<span class="rpg-phone-app-badge">${unread.messages}</span>` : '';
     const callBadge = unread.calls    > 0 ? `<span class="rpg-phone-app-badge">${unread.calls}</span>`   : '';
     const builtinApps = [
-        { id: 'google', icon: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg', label: 'Google' },
-        { id: 'reddit', icon: 'https://upload.wikimedia.org/wikipedia/commons/3/36/Reddit_App_Icon.svg', label: 'Reddit' },
+        { id: 'google', icon: 'https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png', label: 'Google' },
+        { id: 'reddit', icon: 'https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-180x180.png', label: 'Reddit' },
         { id: 'appstore',  icon: '🏪', label: 'App Store' },
         { id: 'messages',  icon: '💬', label: 'Messages', badge: msgBadge  },
         { id: 'dialer',    icon: '📞', label: 'Phone',    badge: callBadge },
