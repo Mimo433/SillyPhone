@@ -1529,12 +1529,13 @@ async function _renderRedditApp(pageId, params, screen) {
     const ps = getPhoneState();
 
     const renderTabs = (activeTab) => `
-<div class="rpg-phone-reddit-tabs">
-  <button class="rpg-phone-reddit-tab ${activeTab === 'foryou' ? 'active' : ''}" data-tab="foryou">For You</button>
-  <button class="rpg-phone-reddit-tab ${activeTab === 'discover' ? 'active' : ''}" data-tab="discover">Discover</button>
-  <button class="rpg-phone-reddit-tab ${activeTab === 'joined' ? 'active' : ''}" data-tab="joined">Joined</button>
-  <button class="rpg-phone-reddit-tab ${activeTab === 'dms' ? 'active' : ''}" data-tab="dms">Chats</button>
-  <button class="rpg-phone-reddit-tab ${activeTab === 'saved' ? 'active' : ''}" data-tab="saved">Saved</button>
+<div class="rpg-phone-reddit-tabs" style="overflow-x: auto; flex-wrap: nowrap;">
+  <button class="rpg-phone-reddit-tab ${activeTab === 'foryou' ? 'active' : ''}" data-tab="foryou" style="white-space: nowrap; padding: 10px 8px;">For You</button>
+  <button class="rpg-phone-reddit-tab ${activeTab === 'feed' ? 'active' : ''}" data-tab="feed" style="white-space: nowrap; padding: 10px 8px;">Feed</button>
+  <button class="rpg-phone-reddit-tab ${activeTab === 'discover' ? 'active' : ''}" data-tab="discover" style="white-space: nowrap; padding: 10px 8px;">Discover</button>
+  <button class="rpg-phone-reddit-tab ${activeTab === 'joined' ? 'active' : ''}" data-tab="joined" style="white-space: nowrap; padding: 10px 8px;">Joined</button>
+  <button class="rpg-phone-reddit-tab ${activeTab === 'dms' ? 'active' : ''}" data-tab="dms" style="white-space: nowrap; padding: 10px 8px;">Chats</button>
+  <button class="rpg-phone-reddit-tab ${activeTab === 'saved' ? 'active' : ''}" data-tab="saved" style="white-space: nowrap; padding: 10px 8px;">Saved</button>
 </div>`;
 
     const bindTabs = () => {
@@ -1628,6 +1629,7 @@ async function _renderRedditApp(pageId, params, screen) {
             if (header) {
                 header.insertAdjacentHTML('afterbegin', renderTabs('feed'));
             }
+            bindTabs();
         };
 
         if (ps.phoneCache[cacheKey]) {
