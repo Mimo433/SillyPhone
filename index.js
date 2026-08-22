@@ -800,12 +800,15 @@ function openPhone() {
     if (!globalThis._rpgPhoneResizeObserver) {
         let resizeTimeout;
         globalThis._rpgPhoneResizeObserver = new ResizeObserver(() => {
+            if (!_isOpen) return; // Ignore resize events while closing/hidden to prevent state bleed
             updatePutDownPos();
             if (shell.style.width || shell.style.height) {
                 clearTimeout(resizeTimeout);
+                const currentModeIsLaptop = globalThis._rpgLaptopMode;
                 resizeTimeout = setTimeout(() => {
+                    if (!_isOpen) return;
                     const st = getSettings();
-                    if (globalThis._rpgLaptopMode) {
+                    if (currentModeIsLaptop) {
                         st.customLaptopWidth = shell.style.width;
                         st.customLaptopHeight = shell.style.height;
                     } else {
@@ -3484,6 +3487,16 @@ function _renderPhoneSettingsApp(pageId, params, screen) {
         if (_isOpen && globalThis._rpgLaptopMode) { _isOpen = false; openPhone(); }
     });
     
+    const inResetDims = document.getElementById('rpg_reset_dims_btn');
+    inResetDims?.addEventListener('click', () => {
+        delete s.customPhoneWidth;
+        delete s.customPhoneHeight;
+        delete s.customLaptopWidth;
+        delete s.customLaptopHeight;
+        saveSettings();
+        if (_isOpen) { _isOpen = false; openPhone(); }
+    });
+    
     document.getElementById('rpg_phone_card_ctx_toggle')?.addEventListener('change', e => { s.includeCardContext = e.target.checked; saveSettings(); });
     document.getElementById('rpg_phone_multihog_toggle')?.addEventListener('change', e => { s.multihogMode = e.target.checked; saveSettings(); });
     document.getElementById('rpg_phone_autoputdown_toggle')?.addEventListener('change', e => { s.autoPutDownMessage = e.target.checked; saveSettings(); });
@@ -3547,6 +3560,9 @@ function _buildSettingsHTML() {
           <label style="flex:1">Laptop Size (%)</label>
           <input type="range" id="sp_laptop_scale" min="50" max="200" value="${s.laptopScale || 100}"/>
           <span id="sp_laptop_scale_label">${s.laptopScale || 100}%</span>
+        </div>
+        <div class="sillyphone-setting-row" style="margin-bottom:8px;">
+          <button id="sp_reset_dimensions_btn" style="width:100%; padding:6px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:6px; cursor:pointer;">Reset Manual Custom Dimensions</button>
         </div>
         <div class="sillyphone-setting-row" style="margin-bottom:8px;">
           <label><input type="checkbox" id="sp_auto_nav_cb" ${s.experimentalAutoNavigate ? 'checked' : ''}/> [Experimental] Auto-Navigate on Phone Action</label>
