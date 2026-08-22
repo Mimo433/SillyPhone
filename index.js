@@ -162,6 +162,102 @@ function cleanToolCallMessage(text) {
         .trim();
 }
 
+function _parseJsonRobust(raw, fallback = null) {
+    if (!raw || typeof raw !== 'string') return fallback;
+
+    let cleaned = raw.trim();
+
+    // 1. Strip markdown codeblock backticks if present
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+    // Try direct parse first if full array or object
+    try {
+        const match = cleaned.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+        if (match) {
+            return JSON.parse(match[1]);
+        }
+    } catch (e) {
+        // Fall through to repair logic
+    }
+
+    // Find first [ or {
+    const firstBracket = cleaned.indexOf('[');
+    const firstBrace = cleaned.indexOf('{');
+    let startIdx = -1;
+    let isArray = false;
+
+    if (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) {
+        startIdx = firstBracket;
+        isArray = true;
+    } else if (firstBrace !== -1) {
+        startIdx = firstBrace;
+        isArray = false;
+    }
+
+    if (startIdx === -1) return fallback;
+
+    let candidate = cleaned.slice(startIdx);
+
+    // 2. Fix missing opening quotes on values: e.g. "author":u/name", -> "author": "u/name",
+    candidate = candidate.replace(/:\s*([a-zA-Z0-9_\-/\.@]+)"/g, ': "$1"');
+
+    // 3. Fix unquoted identifiers like "author": u/name, or "sub": r/name,
+    candidate = candidate.replace(/:\s*(u\/[a-zA-Z0-9_\-]+)(\s*[,}\]])/g, ': "$1"$2');
+    candidate = candidate.replace(/:\s*(r\/[a-zA-Z0-9_\-]+)(\s*[,}\]])/g, ': "$1"$2');
+
+    // 4. Fix trailing commas before } or ]
+    candidate = candidate.replace(/,\s*([}\]])/g, '$1');
+
+    // Try parsing candidate with matched closing brackets
+    try {
+        if (isArray) {
+            const m = candidate.match(/\[[\s\S]*\]/);
+            if (m) return JSON.parse(m[0]);
+        } else {
+            const m = candidate.match(/\{[\s\S]*\}/);
+            if (m) return JSON.parse(m[0]);
+        }
+    } catch (e) {
+        // Fall through to truncation recovery
+    }
+
+    // 5. Handle truncation (e.g. LLM ran out of output tokens midway through an array)
+    if (isArray) {
+        const lastObjEnd = candidate.lastIndexOf('}');
+        if (lastObjEnd !== -1) {
+            let truncated = candidate.slice(0, lastObjEnd + 1).trim();
+            truncated = truncated.replace(/,\s*$/, '') + '\n]';
+            truncated = truncated.replace(/,\s*([}\]])/g, '$1');
+            try {
+                const m = truncated.match(/\[[\s\S]*\]/);
+                if (m) return JSON.parse(m[0]);
+            } catch (e) {
+                // Ignore
+            }
+        }
+    } else {
+        // If object was truncated, try closing with }
+        const lastFieldEnd = Math.max(candidate.lastIndexOf('"'), candidate.lastIndexOf('true'), candidate.lastIndexOf('false'), candidate.lastIndexOf('null'));
+        if (lastFieldEnd !== -1) {
+            let truncated = candidate.slice(0, lastFieldEnd + 1).trim() + '\n}';
+            truncated = truncated.replace(/,\s*([}\]])/g, '$1');
+            try {
+                const m = truncated.match(/\{[\s\S]*\}/);
+                if (m) return JSON.parse(m[0]);
+            } catch (e) {
+                // Ignore
+            }
+        }
+    }
+
+    try {
+        return JSON.parse(candidate);
+    } catch (e) {
+        console.warn('[_parseJsonRobust] Failed to parse JSON:', e.message, '\nRaw was:\n', raw);
+        return fallback;
+    }
+}
+
 function _summarizeText(text, maxLen = 140) {
     if (!text) return '';
     const clean = String(text)
@@ -459,12 +555,8 @@ Reply ONLY with: {"contact": true, "type": "text"|"call"|"missed_call", "message
         let raw;
         try { raw = await sendPhoneRequest(systemPrompt, userPrompt); } catch { return; }
 
-        let parsed;
-        try {
-            const jsonMatch = raw.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) return;
-            parsed = JSON.parse(jsonMatch[0]);
-        } catch { return; }
+        let parsed = _parseJsonRobust(raw, null);
+        if (!parsed) return;
 
         if (!parsed.contact) return;
 
@@ -1337,8 +1429,7 @@ async function _renderGoogleApp(pageId, params, screen) {
         const usr = `${sceneCtx}\n\nGenerate 5 realistic Google search results for the query: "${query}"\nJSON: [{"url":"","title":"","snippet":""}]`;
         try {
             const raw = await sendPhoneRequest(sys, usr);
-            const match = raw.match(/\[[\s\S]*\]/);
-            const results = match ? JSON.parse(match[0]) : [];
+            const results = _parseJsonRobust(raw, []);
             ps.phoneCache[cacheKey] = results;
             savePhoneState();
             _renderGoogleResults(screen, query, results);
@@ -1471,9 +1562,8 @@ async function _renderRedditApp(pageId, params, screen) {
                         const history = subs.map(s => s.name).join(', ');
                         const usr = `${sceneCtx}\n\nGenerate 6 NEW relevant subreddits for this world. Exclude these: ${history}. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
                         const raw  = await sendPhoneRequest(sys, usr);
-                        const match = raw.match(/\[[\s\S]*\]/);
-                        if (match) {
-                            const moreSubs = JSON.parse(match[0]);
+                        const moreSubs = _parseJsonRobust(raw, []);
+                        if (moreSubs && moreSubs.length) {
                             ps.phoneCache[cacheKey] = subs.concat(moreSubs);
                             savePhoneState();
                             _renderRedditApp('home', params, screen);
@@ -1496,8 +1586,7 @@ async function _renderRedditApp(pageId, params, screen) {
         const usr = `${sceneCtx}\n\nGenerate 6 relevant subreddits for this world. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
         try {
             const raw  = await sendPhoneRequest(sys, usr);
-            const match = raw.match(/\[[\s\S]*\]/);
-            const subs  = match ? JSON.parse(match[0]) : [];
+            const subs = _parseJsonRobust(raw, []);
             ps.phoneCache[cacheKey] = subs; savePhoneState();
             renderList(subs);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('home', params, screen); });
@@ -1549,8 +1638,7 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
         
         try {
             const raw  = await sendPhoneRequest(sys, usr);
-            const match = raw.match(/\[[\s\S]*\]/);
-            const posts  = match ? JSON.parse(match[0]) : [];
+            const posts = _parseJsonRobust(raw, []);
             ps.phoneCache[cacheKey] = posts; savePhoneState();
             renderList(posts);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('feed', params, screen); });
@@ -1574,9 +1662,8 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
                         const history = subs.map(s => s.name).join(', ');
                         const usr = `Generate 6 NEW highly popular generic subreddits. Exclude these: ${history}. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
                         const raw  = await sendPhoneRequest(sys, usr);
-                        const match = raw.match(/\[[\s\S]*\]/);
-                        if (match) {
-                            const moreSubs = JSON.parse(match[0]);
+                        const moreSubs = _parseJsonRobust(raw, []);
+                        if (moreSubs && moreSubs.length) {
                             ps.phoneCache[cacheKey] = subs.concat(moreSubs);
                             savePhoneState();
                             _renderRedditApp('discover', params, screen);
@@ -1599,8 +1686,7 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
         try {
             screen.innerHTML = `${renderTabs('discover')}<div style="padding:20px;text-align:center;">Discovering popular communities...</div>`;
             const raw  = await sendPhoneRequest(sys, usr);
-            const match = raw.match(/\[[\s\S]*\]/);
-            const subs  = match ? JSON.parse(match[0]) : [];
+            const subs = _parseJsonRobust(raw, []);
             ps.phoneCache[cacheKey] = subs; savePhoneState();
             renderList(subs);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('discover', params, screen); });
@@ -1634,9 +1720,8 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
                         const history = subs.map(s => s.name).join(', ');
                         const { sys, usr } = getPrompts(history);
                         const raw  = await sendPhoneRequest(sys, usr);
-                        const match = raw.match(/\[[\s\S]*\]/);
-                        if (match) {
-                            const moreSubs = JSON.parse(match[0]);
+                        const moreSubs = _parseJsonRobust(raw, []);
+                        if (moreSubs && moreSubs.length) {
                             ps.phoneCache[cacheKey] = subs.concat(moreSubs);
                             savePhoneState();
                             _renderRedditApp('search', params, screen);
@@ -1658,8 +1743,7 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
         try {
             screen.innerHTML = `${renderTabs('')}<div style="padding:20px;text-align:center;">Searching...</div>`;
             const raw  = await sendPhoneRequest(sys, usr);
-            const match = raw.match(/\[[\s\S]*\]/);
-            const subs  = match ? JSON.parse(match[0]) : [];
+            const subs = _parseJsonRobust(raw, []);
             ps.phoneCache[cacheKey] = subs; savePhoneState();
             renderList(subs);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('search', params, screen); });
@@ -1839,8 +1923,7 @@ Determine if the subreddit '${sub}' is directly related to the specific events o
 Generate 6 Reddit posts for ${sub}. Format: [{"title":"","flair":"","author":"u/name","upvotes":0,"comments":0,"preview":"short preview text","imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>"}]`;
         try {
             const raw   = await sendPhoneRequest(sys, usr);
-            const match  = raw.match(/\[[\s\S]*\]/);
-            const posts  = match ? JSON.parse(match[0]) : [];
+            const posts = _parseJsonRobust(raw, []);
             ps.phoneCache[cacheKey] = posts; savePhoneState();
             renderSub(posts);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('sub', params, screen); });
@@ -1883,8 +1966,7 @@ Preview: ${post.preview || ''}${authorVisual}
 Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","upvotes":0,"text":"comment text","replies":[{"author":"u/name","upvotes":0,"text":"reply"}]}]} CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json or \`\`\`. Write the JSON directly in plain text!`;
         try {
             const raw   = await sendPhoneRequest(sys, usr);
-            const match  = raw.match(/\{[\s\S]*\}/);
-            const data   = match ? JSON.parse(match[0]) : { body: '', comments: [] };
+            const data = _parseJsonRobust(raw, { body: '', comments: [] });
             ps.phoneCache[cacheKey] = data; savePhoneState();
             _renderRedditPost(screen, post, params.sub, data);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('post', params, screen); });
@@ -1943,9 +2025,8 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
                 const usr = `Generate 5 NEW recent posts for reddit user ${user}. Maintain this established vibe/bio:\n"${data.bio}"\nFormat: {"bio":"${data.bio}","visualProfile":${JSON.stringify(data.visualProfile || '')},"recentPosts":[{"title":"","sub":"r/name","upvotes":0,"comments":0,"imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>"}]}`;
                 try {
                     const raw = await sendPhoneRequest(sys, usr);
-                    const match = raw.match(/\{[\s\S]*\}/);
-                    if (match) {
-                        const newData = JSON.parse(match[0]);
+                    const newData = _parseJsonRobust(raw, null);
+                    if (newData) {
                         data.recentPosts = newData.recentPosts;
                         ps.phoneCache[cacheKey] = data;
                         savePhoneState();
@@ -1974,8 +2055,7 @@ Reply ONLY with: {"body":"full post body text","comments":[{"author":"u/name","u
         try {
             screen.innerHTML = `<div class="rpg-phone-loading"><div class="rpg-phone-spinner"></div><p>Loading Profile…</p></div>`;
             const raw = await sendPhoneRequest(sys, usr);
-            const match = raw.match(/\{[\s\S]*\}/);
-            const data = match ? JSON.parse(match[0]) : { bio: '', recentPosts: [] };
+            const data = _parseJsonRobust(raw, { bio: '', recentPosts: [] });
             if (params.sourcePost && params.sourcePost.author === user) {
                 data.recentPosts = data.recentPosts.filter(p => p.title !== params.sourcePost.title);
                 data.recentPosts.unshift(params.sourcePost);
@@ -2358,9 +2438,8 @@ function _renderRedditPost(screen, post, sub, data) {
         const usr = `${sceneCtx}\n\nPost Title: "${post.title}"\nExisting Comments:\n${historyStr}\n\nGenerate 3 NEW top-level comments to append to this thread from strangers on the internet. Format: [{"author":"u/name","upvotes":0,"text":"comment text","replies":[]}]`;
         try {
             const raw = await sendPhoneRequest(sys, usr);
-            const match = raw.match(/\[[\s\S]*\]/);
-            if (match) {
-                const newComms = JSON.parse(match[0]);
+            const newComms = _parseJsonRobust(raw, []);
+            if (newComms && newComms.length) {
                 data.comments = data.comments.concat(newComms);
                 const cacheKey = `reddit_post_${sub}_${encodeURIComponent(post.title || '')}`;
                 ps.phoneCache[cacheKey] = data;
@@ -2399,9 +2478,8 @@ function _renderRedditPost(screen, post, sub, data) {
             const sys = `You generate a reply to a user's comment on a Reddit post in this story world. The author is a stranger. Reply ONLY valid JSON. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json or \`\`\`. Write the JSON directly in plain text!`;
             const usr = `${sceneCtx}\n\nPost: "${post.title}"\nUser (${myUsername}) commented: "${text}"\nGenerate 1 realistic Reddit reply to this comment from another user.\nFormat: {"author":"u/name","upvotes":0,"text":"comment text"}`;
             const raw = await sendPhoneRequest(sys, usr);
-            const match = raw.match(/\{[\s\S]*\}/);
-            if (match) {
-                const replyData = JSON.parse(match[0]);
+            const replyData = _parseJsonRobust(raw, null);
+            if (replyData) {
                 replyData.replies = [];
                 // Add the AI reply to the array we just pushed to
                 targetArr[targetArr.length - 1].replies.push(replyData);
@@ -2512,9 +2590,8 @@ async function _renderAppStoreApp(pageId, params, screen) {
             const usr = `${sceneCtx}\n\nDesign the app: "${name}" — ${desc}\nBlueprint format: {"id":"slug","name":"","icon":"","description":"","tagline":"","categories":["cat1","cat2"],"feedLabel":"Latest","feedItems":[{"title":"","subtitle":"","badge":"","description":"","stats":{"stat1":"val"},"actions":[{"label":"Action","prompt":"<instruction for AI>"}],"reviews":[{"user":"","text":""}]}]}`;
             try {
                 const raw   = await sendPhoneRequest(sys, usr);
-                const match  = raw.match(/\{[\s\S]*\}/);
-                if (!match) throw new Error('No JSON found');
-                const bp = JSON.parse(match[0]);
+                const bp = _parseJsonRobust(raw, null);
+                if (!bp) throw new Error('No JSON found');
                 if (!bp.id) bp.id = name.toLowerCase().replace(/\W+/g, '_') + '_' + Date.now();
                 if (!bp.name) bp.name = name;
                 if (!bp.icon) bp.icon = icon;
@@ -2552,8 +2629,7 @@ async function _renderInstalledApp(appId, pageId, params, screen) {
         const usr = `${sceneCtx}\n\nGenerate 5 content cards for ${app.name}. Use same structure as the blueprint feedItems: [{"title":"","subtitle":"","badge":"","description":"","stats":{},"actions":[{"label":"","prompt":""}],"reviews":[]}]`;
         try {
             const raw   = await sendPhoneRequest(sys, usr);
-            const match  = raw.match(/\[[\s\S]*\]/);
-            const items  = match ? JSON.parse(match[0]) : app.feedItems || [];
+            const items  = _parseJsonRobust(raw, app.feedItems || []);
             ps.phoneCache[cacheKey] = items; savePhoneState();
             _renderAppFeed(screen, app, items);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderInstalledApp(appId, 'home', params, screen); });
@@ -3582,9 +3658,8 @@ Reply ONLY with valid JSON. CRITICAL: DO NOT wrap the output in markdown code bl
         const usr = `Recent narrative:\n${combinedNarrative}\n\nDid the roleplay just show the player navigating their phone? Return JSON.`;
 
         const raw = await sendPhoneRequest(sys, usr);
-        const match = raw.match(/\{[\s\S]*\}/);
-        if (!match) return;
-        const parsed = JSON.parse(match[0]);
+        const parsed = _parseJsonRobust(raw, null);
+        if (!parsed) return;
 
         if (parsed.navigate && parsed.app) {
             if (!_isOpen) openPhone();
