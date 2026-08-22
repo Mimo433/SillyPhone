@@ -1435,7 +1435,7 @@ async function _renderRedditApp(pageId, params, screen) {
         });
     };
 
-    const _injectSearchBar = (header) => {
+    const _injectSearchBar = (header, sourcePageId) => {
         if (!header) return;
         const searchHtml = `
         <div class="rpg-phone-reddit-search">
@@ -1446,7 +1446,7 @@ async function _renderRedditApp(pageId, params, screen) {
         header.insertAdjacentHTML('afterend', searchHtml);
         const doSearch = () => {
             const q = document.getElementById('rph_reddit_search_input')?.value.trim();
-            if (q) _navigateTo('reddit', 'search', { query: q });
+            if (q) _navigateTo('reddit', 'search', { query: q, source: sourcePageId });
         };
         const doGo = () => {
             const q = document.getElementById('rph_reddit_search_input')?.value.trim();
@@ -1482,7 +1482,7 @@ async function _renderRedditApp(pageId, params, screen) {
                 }
             });
             bindTabs();
-            _injectSearchBar(screen.querySelector('.rpg-phone-reddit-header'));
+            _injectSearchBar(screen.querySelector('.rpg-phone-reddit-header'), pageId);
         };
 
         if (ps.phoneCache[cacheKey]) {
@@ -1585,7 +1585,7 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
                 }
             });
             bindTabs();
-            _injectSearchBar(screen.querySelector('.rpg-phone-reddit-header'));
+            _injectSearchBar(screen.querySelector('.rpg-phone-reddit-header'), pageId);
         };
 
         if (ps.phoneCache[cacheKey]) {
@@ -1610,17 +1610,29 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
 
     if (pageId === 'search') {
         const query = params.query;
+        const source = params.source || 'home';
+        const isDiscover = (source === 'discover');
+        
         _logPhoneActivity('reddit', 'Reddit', 'out', 'Searched Reddit for: ' + query);
-        const cacheKey = `reddit_subs_search_${query}`;
+        const cacheKey = `reddit_subs_search_${query}_${source}`;
+        
+        const getPrompts = (history = '') => {
+            const sceneCtx = isDiscover ? '' : _buildSceneContext(1000) + '\n\n';
+            const ctxGuidance = isDiscover ? '' : ' that fit logically within this story universe';
+            const sys = `You generate a list of reddit communities that match a search query${isDiscover ? '' : ' within the context of a fictional universe'}. Reply ONLY valid JSON array. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json or \`\`\`. Write the JSON directly in plain text!`;
+            const excl = history ? ` Exclude these: ${history}.` : '';
+            const usr = `${sceneCtx}Search Query: "${query}"\nGenerate 6${history ? ' NEW' : ''} subreddits matching this query${ctxGuidance}.${excl} Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
+            return { sys, usr };
+        };
+
         const renderList = (subs) => {
             _renderRedditSubList(screen, subs, renderTabs(''), {
                 title: `Search: ${query}`,
                 allowLoadMore: true,
                 onLoadMore: async () => {
                     try {
-                        const sys = `You generate a list of reddit communities that match a search query. Reply ONLY valid JSON array. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json or \`\`\`. Write the JSON directly in plain text!`;
                         const history = subs.map(s => s.name).join(', ');
-                        const usr = `Search Query: "${query}"\nGenerate 6 NEW subreddits matching this query. Exclude these: ${history}. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
+                        const { sys, usr } = getPrompts(history);
                         const raw  = await sendPhoneRequest(sys, usr);
                         const match = raw.match(/\[[\s\S]*\]/);
                         if (match) {
@@ -1633,7 +1645,7 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
                 }
             });
             bindTabs();
-            _injectSearchBar(screen.querySelector('.rpg-phone-reddit-header'));
+            _injectSearchBar(screen.querySelector('.rpg-phone-reddit-header'), params.source);
         };
 
         if (ps.phoneCache[cacheKey]) {
@@ -1642,8 +1654,7 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
             return;
         }
 
-        const sys = `You generate a list of reddit communities that match a search query. Reply ONLY valid JSON array. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json or \`\`\`. Write the JSON directly in plain text!`;
-        const usr = `Search Query: "${query}"\nGenerate 6 subreddits matching this query. Format: [{"name":"r/name","icon":"emoji","description":"short desc"}]`;
+        const { sys, usr } = getPrompts();
         try {
             screen.innerHTML = `${renderTabs('')}<div style="padding:20px;text-align:center;">Searching...</div>`;
             const raw  = await sendPhoneRequest(sys, usr);
