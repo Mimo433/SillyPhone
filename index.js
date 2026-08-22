@@ -151,11 +151,11 @@ function _escHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
-function _renderIcon(icon) {
+function _renderIcon(icon, sizeStyle = 'width:100%; height:100%;') {
     if (!icon) return '📱';
     const clean = icon.trim();
     if (clean.startsWith('http') || clean.startsWith('data:image') || clean.startsWith('/')) {
-        return `<img src="${_escHtml(clean)}" style="width:100%; height:100%; object-fit:contain; border-radius:14px; pointer-events:none;" />`;
+        return `<img src="${_escHtml(clean)}" style="${sizeStyle} object-fit:contain; border-radius:inherit; pointer-events:none; vertical-align:middle;" />`;
     }
     return clean;
 }
@@ -1133,11 +1133,15 @@ function _renderHomeScreen() {
     ];
     const installedApps = (ps?.phoneApps || []).map(app => ({ id: `installed_${app.id}`, icon: app.icon || '📱', label: app.name, installed: true }));
     const allApps = [...builtinApps, ...installedApps];
-    const iconsHTML = allApps.map(app => `
+    const iconsHTML = allApps.map(app => {
+        const isImg = app.icon && (app.icon.trim().startsWith('http') || app.icon.trim().startsWith('data:image') || app.icon.trim().startsWith('/'));
+        const bgStyle = isImg ? 'background:transparent; border:none; box-shadow:none;' : '';
+        return `
 <div class="rpg-phone-app-icon" data-app="${app.id}" role="button" tabindex="0" aria-label="${app.label}">
-  <div class="rpg-phone-app-icon-img">${_renderIcon(app.icon)}${app.badge || ''}</div>
+  <div class="rpg-phone-app-icon-img" style="${bgStyle}">${_renderIcon(app.icon)}${app.badge || ''}</div>
   <div class="rpg-phone-app-icon-label">${app.label}</div>
-</div>`).join('');
+</div>`;
+    }).join('');
     screen.innerHTML = `<div class="rpg-phone-homescreen">${iconsHTML}</div>`;
     screen.querySelectorAll('.rpg-phone-app-icon').forEach(el => {
         el.addEventListener('click', () => _navigateTo(el.dataset.app));
@@ -1816,7 +1820,7 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
         const items = joined.map((s, i) => `
 <div class="rpg-phone-reddit-sub" data-idx="${i}" style="justify-content: space-between;">
   <div style="display: flex; align-items: center; gap: 12px;">
-    <div class="rpg-phone-reddit-sub-icon">${s.icon || '🤖'}</div>
+    <div class="rpg-phone-reddit-sub-icon" style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px;">${_renderIcon(s.icon || \'🤖\')}</div>
     <div>
       <div class="rpg-phone-reddit-sub-name">${_escHtml(s.name)}</div>
       <div class="rpg-phone-reddit-sub-desc">${_escHtml(s.description || '')}</div>
@@ -2227,7 +2231,7 @@ function _renderRedditSubList(screen, subs, tabsHtml = '', config = {}) {
         return `
 <div class="rpg-phone-reddit-sub" data-idx="${i}" style="justify-content: space-between;">
   <div style="display: flex; align-items: center; gap: 12px;">
-    <div class="rpg-phone-reddit-sub-icon">${s.icon || '🤖'}</div>
+    <div class="rpg-phone-reddit-sub-icon" style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px;">${_renderIcon(s.icon || \'🤖\')}</div>
     <div>
       <div class="rpg-phone-reddit-sub-name">${_escHtml(s.name)}</div>
       <div class="rpg-phone-reddit-sub-desc">${_escHtml(s.description || '')}</div>
@@ -2561,7 +2565,7 @@ async function _renderAppStoreApp(pageId, params, screen) {
         _logPhoneActivity('app', 'App Store', 'out', 'Browsed App Store');
         const installedHTML = (ps.phoneApps || []).map(a => `
 <div class="rpg-phone-appstore-installed" data-appid="${_escHtml(a.id)}" style="cursor:pointer">
-  <span class="rpg-phone-appstore-app-icon">${a.icon || '📱'}</span>
+  <span class="rpg-phone-appstore-app-icon" style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px;">${_renderIcon(a.icon || \'📱\')}</span>
   <div>
     <div class="rpg-phone-appstore-app-name">${_escHtml(a.name)}</div>
     <div class="rpg-phone-appstore-app-desc">${_escHtml(a.description || '')}</div>
@@ -2761,7 +2765,7 @@ function _renderAppFeed(screen, app, items) {
 <div class="rpg-phone-custom-app">
   <div class="rpg-phone-app-banner">
     <div class="rpg-phone-app-header-left">
-      <span class="rpg-phone-app-header-icon">${app.icon || '📱'}</span>
+      <span class="rpg-phone-app-header-icon" style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px;">${_renderIcon(app.icon || \'📱\')}</span>
       <div>
         <div class="rpg-phone-app-header-title">${_escHtml(app.name)}</div>
         <div class="rpg-phone-app-header-tagline">${_escHtml(app.tagline || app.description || '')}</div>
