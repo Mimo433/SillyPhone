@@ -63,6 +63,8 @@
         inset 0 1px 0 rgba(255,255,255,0.08);
     display: flex; flex-direction: column;
     overflow: hidden;
+    resize: both;
+    min-width: 250px; min-height: 400px;
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
     color: #e0e0e0;
     position: relative;
@@ -435,7 +437,7 @@
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0,0,0,0.7);
-    z-index: 10000;
+    z-index: 100000;
     display: flex;
     justify-content: center;
     align-items: center;

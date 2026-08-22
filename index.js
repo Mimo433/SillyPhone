@@ -759,11 +759,11 @@ function openPhone() {
     const s = getSettings();
     const shell = _phoneEl.querySelector('.rpg-phone-shell');
     
-    // Clear previously hardcoded dimension overrides
+    // Restore custom dimension overrides
     _phoneEl.style.width = '';
     _phoneEl.style.height = '';
-    shell.style.width = '';
-    shell.style.height = '';
+    shell.style.width = globalThis._rpgLaptopMode ? (s.customLaptopWidth || '') : (s.customPhoneWidth || '');
+    shell.style.height = globalThis._rpgLaptopMode ? (s.customLaptopHeight || '') : (s.customPhoneHeight || '');
     _phoneEl.querySelector('.rpg-phone-screen').style.fontSize = '';
 
     let finalScale = 1;
@@ -788,10 +788,35 @@ function openPhone() {
     
     // Update put down button text and position
     const btn = _phoneEl.querySelector('#rpg_phone_putdown_btn');
-    if (btn) {
-        btn.innerHTML = globalThis._rpgLaptopMode ? '💻 Close computer' : '📱 Put down phone';
-        const h = shell.offsetHeight || 812;
-        btn.style.top = `calc(50% - ${(h * finalScale / 2) + 40}px)`;
+    const updatePutDownPos = () => {
+        if (btn) {
+            btn.innerHTML = globalThis._rpgLaptopMode ? '💻 Close computer' : '📱 Put down phone';
+            const h = shell.offsetHeight || 812;
+            btn.style.top = `calc(50% - ${(h * finalScale / 2) + 40}px)`;
+        }
+    };
+    updatePutDownPos();
+
+    if (!globalThis._rpgPhoneResizeObserver) {
+        let resizeTimeout;
+        globalThis._rpgPhoneResizeObserver = new ResizeObserver(() => {
+            updatePutDownPos();
+            if (shell.style.width || shell.style.height) {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    const st = getSettings();
+                    if (globalThis._rpgLaptopMode) {
+                        st.customLaptopWidth = shell.style.width;
+                        st.customLaptopHeight = shell.style.height;
+                    } else {
+                        st.customPhoneWidth = shell.style.width;
+                        st.customPhoneHeight = shell.style.height;
+                    }
+                    saveSettings();
+                }, 500);
+            }
+        });
+        globalThis._rpgPhoneResizeObserver.observe(shell);
     }
 }
 
