@@ -2223,8 +2223,17 @@ function _bindRedditUserLinks(screen) {
                 if (postEl.dataset.postJson) {
                     try { originalPost = JSON.parse(postEl.dataset.postJson); } catch (e) {}
                 }
-                const title = postEl.querySelector('.rpg-phone-reddit-post-title, .rpg-phone-reddit-post-detail-title')?.textContent;
-                if (title) context += `Post Title: "${title}"\n`;
+                if (originalPost) {
+                    if (originalPost.sub) context += `Subreddit: "${originalPost.sub}"\n`;
+                    context += `Post Title: "${originalPost.title || ''}"\n`;
+                    if (originalPost.flair) context += `Post Flair: "${originalPost.flair}"\n`;
+                    if (originalPost.preview) context += `Post Preview: "${originalPost.preview}"\n`;
+                    if (originalPost.body) context += `Post Body: "${originalPost.body}"\n`;
+                    if (originalPost.imagePrompt) context += `Post Image: "${originalPost.imagePrompt}"\n`;
+                } else {
+                    const title = postEl.querySelector('.rpg-phone-reddit-post-title, .rpg-phone-reddit-post-detail-title')?.textContent;
+                    if (title) context += `Post Title: "${title}"\n`;
+                }
             }
             const commentEl = el.closest('.rpg-phone-reddit-comment');
             if (commentEl) {
@@ -2441,7 +2450,7 @@ function _renderRedditPost(screen, post, sub, data) {
     const commentsHTML = renderComments(data.comments);
 
     screen.innerHTML = `
-<div class="rpg-phone-reddit-post-detail" data-post-json="${_escHtml(JSON.stringify(post))}">
+<div class="rpg-phone-reddit-post-detail" data-post-json="${_escHtml(JSON.stringify({ ...post, body: data.body }))}">
   <div class="rpg-phone-reddit-post-meta" style="margin-bottom:8px;"><span class="rpg-phone-reddit-user-link">${_escHtml(post.author || '')}</span></div>
   ${post.flair ? `<span class="rpg-phone-reddit-flair">${_escHtml(post.flair)}</span>` : ''}
   <div class="rpg-phone-reddit-post-detail-title">${_escHtml(post.title || '')}</div>
