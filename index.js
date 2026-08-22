@@ -766,16 +766,17 @@ function openPhone() {
     shell.style.height = '';
     _phoneEl.querySelector('.rpg-phone-screen').style.fontSize = '';
 
+    let finalScale = 1;
     if (globalThis._rpgLaptopMode) {
         _phoneEl.dataset.device = 'laptop';
-        const ls = (s.laptopScale || 100) / 100;
-        shell.style.transform = `scale(${ls})`;
+        finalScale = (s.laptopScale || 100) / 100;
+        shell.style.transform = `scale(${finalScale})`;
         shell.style.transformOrigin = 'center center';
     } else {
         delete _phoneEl.dataset.device;
-        let ps = (s.phoneScale || 100) / 100;
-        if (s.phoneMode) ps *= 0.85; // Mobile layout support
-        shell.style.transform = `scale(${ps})`;
+        finalScale = (s.phoneScale || 100) / 100;
+        if (s.phoneMode) finalScale *= 0.85; // Mobile layout support
+        shell.style.transform = `scale(${finalScale})`;
         shell.style.transformOrigin = 'center center';
     }
     
@@ -785,9 +786,13 @@ function openPhone() {
     _updateStatusBar();
     _navigateHome();
     
-    // Update put down button text
+    // Update put down button text and position
     const btn = _phoneEl.querySelector('#rpg_phone_putdown_btn');
-    if (btn) btn.innerHTML = globalThis._rpgLaptopMode ? '💻 Close computer' : '📱 Put down phone';
+    if (btn) {
+        btn.innerHTML = globalThis._rpgLaptopMode ? '💻 Close computer' : '📱 Put down phone';
+        const h = shell.offsetHeight || 812;
+        btn.style.top = `calc(50% - ${(h * finalScale / 2) + 40}px)`;
+    }
 }
 
 function closePhone() {
