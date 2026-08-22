@@ -1633,7 +1633,7 @@ async function _renderRedditApp(pageId, params, screen) {
         _logPhoneActivity('reddit', 'Reddit', 'out', 'Opened Reddit Feed');
         const cacheKey = 'reddit_posts_feed';
         const renderList = (posts) => {
-            _renderRedditFeed(screen, 'Your Feed', posts);
+            _renderRedditFeed(screen, 'Your Feed', posts, () => _renderRedditApp('feed', { ...params, loadMore: true }, screen));
             const header = screen.querySelector('.rpg-phone-reddit-sub-header');
             if (header) {
                 header.insertAdjacentHTML('afterbegin', renderTabs('feed'));
@@ -1641,7 +1641,7 @@ async function _renderRedditApp(pageId, params, screen) {
             bindTabs();
         };
 
-        if (ps.phoneCache[cacheKey]) {
+        if (ps.phoneCache[cacheKey] && !params.loadMore) {
             renderList(ps.phoneCache[cacheKey]);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('feed', params, screen); });
             return;
@@ -1656,7 +1656,9 @@ async function _renderRedditApp(pageId, params, screen) {
             return `${u} (Bio: ${prof?.bio||''}, Visual: ${prof?.visualProfile||''})`;
         }).join(' | ');
         
-        const sys = `You generate a highly personalized Reddit timeline for a user. You must generate 6 posts total.
+        const s = getSettings();
+        const postCount = s.redditFeedPostCount || '8-12';
+        const sys = `You generate a highly personalized Reddit timeline for a user. You must generate ${postCount} posts total.
 The posts should be a mix of:
 1. Posts from subreddits they joined (specify the subreddit in 'sub').
 2. Posts from users they follow (specify the user in 'author', and their sub).
@@ -1675,9 +1677,14 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
         try {
             const raw  = await sendPhoneRequest(sys, usr);
             const posts = _parseJsonRobust(raw, []);
-            ps.phoneCache[cacheKey] = posts; savePhoneState();
-            renderList(posts);
-            _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('feed', params, screen); });
+            if (params.loadMore && ps.phoneCache[cacheKey]) {
+                ps.phoneCache[cacheKey] = [...ps.phoneCache[cacheKey], ...posts];
+            } else {
+                ps.phoneCache[cacheKey] = posts;
+            }
+            savePhoneState();
+            renderList(ps.phoneCache[cacheKey]);
+            _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('feed', { ...params, loadMore: false }, screen); });
         } catch (e) { 
             screen.innerHTML = `${renderTabs('feed')}<div class="rpg-phone-error">Feed unavailable: ${_escHtml(e.message)}</div>`; 
             bindTabs(); 
@@ -1820,7 +1827,7 @@ CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json 
         const items = joined.map((s, i) => `
 <div class="rpg-phone-reddit-sub" data-idx="${i}" style="justify-content: space-between;">
   <div style="display: flex; align-items: center; gap: 12px;">
-    <div class="rpg-phone-reddit-sub-icon" style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px;">${_renderIcon(s.icon || \'🤖\')}</div>
+    <div class="rpg-phone-reddit-sub-icon" style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px;">${_renderIcon(s.icon || '🤖')}</div>
     <div>
       <div class="rpg-phone-reddit-sub-name">${_escHtml(s.name)}</div>
       <div class="rpg-phone-reddit-sub-desc">${_escHtml(s.description || '')}</div>
@@ -1938,7 +1945,7 @@ ${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">Y
         };
 
         const cacheKey = `reddit_feed_${sub}`;
-        if (ps.phoneCache[cacheKey]) {
+        if (ps.phoneCache[cacheKey] && !params.loadMore) {
             renderSub(ps.phoneCache[cacheKey]);
             _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('sub', params, screen); });
             return;
@@ -1948,6 +1955,7 @@ ${items || '<p class="rpg-phone-muted" style="text-align:center;padding:20px;">Y
         const subCtx = customSub && customSub.description ? `This community is about: ${customSub.description}` : '';
 
         const s = getSettings();
+        const postCount = s.redditFeedPostCount || '8-12';
         const sceneCtx = _buildSceneContext(1000);
         const sys = `You generate realistic Reddit posts for the community ${sub} in this story world. Reply ONLY valid JSON array. CRITICAL: DO NOT wrap the output in markdown code blocks. DO NOT use \`\`\`json or \`\`\`. Write the JSON directly in plain text!`;
         const usr = `${sceneCtx}\n\n${subCtx}
@@ -1956,13 +1964,18 @@ Determine if the subreddit '${sub}' is directly related to the specific events o
 - If YES: You may include posts related to those topics.
 - If NO (e.g. it's a generic sub like r/news, r/gaming, r/aww): The posts MUST be completely unrelated to the chat context. They should be random, worldly posts by strangers on the internet.
 
-Generate 6 Reddit posts for ${sub}. Format: [{"title":"","flair":"","author":"u/name","upvotes":0,"comments":0,"preview":"short preview text","imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>"}]`;
+Generate ${postCount} Reddit posts for ${sub}. Format: [{"title":"","flair":"","author":"u/name","upvotes":0,"comments":0,"preview":"short preview text","imagePrompt":"<${s.imagePromptInstruction || 'visual description if applicable, else empty'}>"}]`;
         try {
             const raw   = await sendPhoneRequest(sys, usr);
             const posts = _parseJsonRobust(raw, []);
-            ps.phoneCache[cacheKey] = posts; savePhoneState();
-            renderSub(posts);
-            _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('sub', params, screen); });
+            if (params.loadMore && ps.phoneCache[cacheKey]) {
+                ps.phoneCache[cacheKey] = [...ps.phoneCache[cacheKey], ...posts];
+            } else {
+                ps.phoneCache[cacheKey] = posts;
+            }
+            savePhoneState();
+            renderSub(ps.phoneCache[cacheKey]);
+            _setRefreshAction(() => { delete ps.phoneCache[cacheKey]; savePhoneState(); _renderRedditApp('sub', { ...params, loadMore: false }, screen); });
         } catch (e) { screen.innerHTML = `<div class="rpg-phone-error">Feed failed: ${_escHtml(e.message)}</div>`; }
         return;
     }
@@ -2231,7 +2244,7 @@ function _renderRedditSubList(screen, subs, tabsHtml = '', config = {}) {
         return `
 <div class="rpg-phone-reddit-sub" data-idx="${i}" style="justify-content: space-between;">
   <div style="display: flex; align-items: center; gap: 12px;">
-    <div class="rpg-phone-reddit-sub-icon" style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px;">${_renderIcon(s.icon || \'🤖\')}</div>
+    <div class="rpg-phone-reddit-sub-icon" style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px;">${_renderIcon(s.icon || '🤖')}</div>
     <div>
       <div class="rpg-phone-reddit-sub-name">${_escHtml(s.name)}</div>
       <div class="rpg-phone-reddit-sub-desc">${_escHtml(s.description || '')}</div>
@@ -2287,7 +2300,7 @@ function _renderRedditSubList(screen, subs, tabsHtml = '', config = {}) {
     }
 }
 
-function _renderRedditFeed(screen, sub, posts) {
+function _renderRedditFeed(screen, sub, posts, onLoadMore) {
     const ps = getPhoneState();
     const postsHTML = posts.map((p, i) => {
         const actualSub = p.sub || sub;
@@ -2321,8 +2334,24 @@ function _renderRedditFeed(screen, sub, posts) {
 </div>`;
     }).join('');
     
-    screen.innerHTML = `<div class="rpg-phone-reddit-sub-header">${_escHtml(sub)}</div>${postsHTML}`;
-    _bindRedditUserLinks(screen);
+          let loadMoreHTML = '';
+      if (onLoadMore) {
+          loadMoreHTML = `<div style="text-align:center; padding: 16px; padding-bottom:32px;"><button id="rph_reddit_feed_load_more" class="rpg-phone-reddit-btn" style="padding:8px 16px;">Load More</button></div>`;
+      }
+      screen.innerHTML = `<div class="rpg-phone-reddit-sub-header">${_escHtml(sub)}</div>${postsHTML}${loadMoreHTML}`;
+      _bindRedditUserLinks(screen);
+      
+      if (onLoadMore) {
+          const loadBtn = document.getElementById('rph_reddit_feed_load_more');
+          if (loadBtn) {
+              loadBtn.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  loadBtn.disabled = true;
+                  loadBtn.textContent = 'Loading...';
+                  onLoadMore();
+              });
+          }
+      }
     
     screen.querySelectorAll('.rpg-phone-reddit-sub-link').forEach(el => {
         el.addEventListener('click', (e) => {
@@ -2565,7 +2594,7 @@ async function _renderAppStoreApp(pageId, params, screen) {
         _logPhoneActivity('app', 'App Store', 'out', 'Browsed App Store');
         const installedHTML = (ps.phoneApps || []).map(a => `
 <div class="rpg-phone-appstore-installed" data-appid="${_escHtml(a.id)}" style="cursor:pointer">
-  <span class="rpg-phone-appstore-app-icon" style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px;">${_renderIcon(a.icon || \'📱\')}</span>
+  <span class="rpg-phone-appstore-app-icon" style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px;">${_renderIcon(a.icon || '📱')}</span>
   <div>
     <div class="rpg-phone-appstore-app-name">${_escHtml(a.name)}</div>
     <div class="rpg-phone-appstore-app-desc">${_escHtml(a.description || '')}</div>
@@ -2765,7 +2794,7 @@ function _renderAppFeed(screen, app, items) {
 <div class="rpg-phone-custom-app">
   <div class="rpg-phone-app-banner">
     <div class="rpg-phone-app-header-left">
-      <span class="rpg-phone-app-header-icon" style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px;">${_renderIcon(app.icon || \'📱\')}</span>
+      <span class="rpg-phone-app-header-icon" style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px;">${_renderIcon(app.icon || '📱')}</span>
       <div>
         <div class="rpg-phone-app-header-title">${_escHtml(app.name)}</div>
         <div class="rpg-phone-app-header-tagline">${_escHtml(app.tagline || app.description || '')}</div>
@@ -3505,6 +3534,19 @@ function _buildSettingsHTML() {
         </div>
         <div class="sillyphone-setting-row" style="margin-bottom:8px;">
           <label><input type="checkbox" id="sp_putdown_textbox_cb" ${s.putDownMessageToTextbox ? 'checked' : ''}/> Place "Put down" message in textbox instead of sending</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="inline-drawer">
+      <div class="inline-drawer-toggle" style="display:flex; justify-content:space-between; align-items:center; padding:6px 4px; margin-top:6px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.1);">
+        <b>👽 Reddit</b>
+        <div class="inline-drawer-icon fa-solid fa-chevron-down down" style="opacity:0.5; font-size:12px;"></div>
+      </div>
+      <div class="inline-drawer-content" style="padding-top:8px;">
+        <div class="sillyphone-setting-row" style="margin-bottom:8px; flex-direction:column; align-items:flex-start; gap:4px;">
+          <label>Initial Feed Posts (Range or Number)</label>
+          <input type="text" id="sp_reddit_feed_count" value="${s.redditFeedPostCount || '8-12'}" style="width:100%; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); color:white; padding:4px 8px; border-radius:4px;" />
         </div>
       </div>
     </div>
