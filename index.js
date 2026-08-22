@@ -151,6 +151,15 @@ function _escHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
+function _renderIcon(icon) {
+    if (!icon) return '📱';
+    const clean = icon.trim();
+    if (clean.startsWith('http') || clean.startsWith('data:image') || clean.startsWith('/')) {
+        return `<img src="${_escHtml(clean)}" style="width:100%; height:100%; object-fit:contain; border-radius:14px; pointer-events:none;" />`;
+    }
+    return clean;
+}
+
 /** Strip tool call blocks and HTML from AI-generated text */
 function cleanToolCallMessage(text) {
     if (!text) return '';
@@ -731,10 +740,13 @@ function _recordPhoneActivity() {
     const now = Date.now();
     const delta = now - _phoneLastActivityTime;
     
-    // Only add time if the gap since last activity is less than the idle timeout
-    if (delta < IDLE_TIMEOUT_MS) {
-        _phoneActiveTimeMs += delta;
+    // Accumulate time in persistent state
+    const ps = getPhoneState();
+    if (ps) {
+        ps.phoneActiveTimeMs = (ps.phoneActiveTimeMs || 0) + Math.min(delta, IDLE_TIMEOUT_MS);
+        savePhoneState();
     }
+    
     _phoneLastActivityTime = now;
 }
 
@@ -742,7 +754,6 @@ function openPhone() {
     if (!_phoneEl) _buildPhonePanel();
     _isOpen = true;
     _phoneSessionStartTime = Date.now();
-    _phoneActiveTimeMs = 0;
     _phoneLastActivityTime = Date.now();
     
     const s = getSettings();
@@ -884,10 +895,19 @@ function _buildPhonePanel() {
         const s = getSettings();
         if (s.autoPutDownMessage !== false) {
             _recordPhoneActivity(); // ensure final time is captured
-            const minutes = Math.max(1, Math.round(_phoneActiveTimeMs / 60000));
+            const ps = getPhoneState();
+            const totalMs = ps ? (ps.phoneActiveTimeMs || 0) : 0;
+            const minutes = Math.max(1, Math.round(totalMs / 60000));
             const deviceName = globalThis._rpgLaptopMode ? 'computer' : 'phone';
             const action = globalThis._rpgLaptopMode ? 'closed' : 'put down';
             const msg = `You ${action} the ${deviceName} after using it for ${minutes} minute${minutes > 1 ? 's' : ''}.`;
+            
+            // Reset active time since they intentionally put it down
+            if (ps) {
+                ps.phoneActiveTimeMs = 0;
+                savePhoneState();
+            }
+            
             if (s.putDownMessageToTextbox) {
                 const ta = document.getElementById('send_textarea');
                 if (ta) {
@@ -1096,8 +1116,8 @@ function _renderHomeScreen() {
     const msgBadge  = unread.messages > 0 ? `<span class="rpg-phone-app-badge">${unread.messages}</span>` : '';
     const callBadge = unread.calls    > 0 ? `<span class="rpg-phone-app-badge">${unread.calls}</span>`   : '';
     const builtinApps = [
-        { id: 'google',    icon: '🔍', label: 'Google'    },
-        { id: 'reddit',    icon: '🤖', label: 'Reddit'    },
+        { id: 'google', icon: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg', label: 'Google' },
+        { id: 'reddit', icon: 'https://upload.wikimedia.org/wikipedia/commons/3/36/Reddit_App_Icon.svg', label: 'Reddit' },
         { id: 'appstore',  icon: '🏪', label: 'App Store' },
         { id: 'messages',  icon: '💬', label: 'Messages', badge: msgBadge  },
         { id: 'dialer',    icon: '📞', label: 'Phone',    badge: callBadge },
@@ -1110,7 +1130,7 @@ function _renderHomeScreen() {
     const allApps = [...builtinApps, ...installedApps];
     const iconsHTML = allApps.map(app => `
 <div class="rpg-phone-app-icon" data-app="${app.id}" role="button" tabindex="0" aria-label="${app.label}">
-  <div class="rpg-phone-app-icon-img">${app.icon}${app.badge || ''}</div>
+  <div class="rpg-phone-app-icon-img">${_renderIcon(app.icon)}${app.badge || ''}</div>
   <div class="rpg-phone-app-icon-label">${app.label}</div>
 </div>`).join('');
     screen.innerHTML = `<div class="rpg-phone-homescreen">${iconsHTML}</div>`;
@@ -2592,9 +2612,10 @@ async function _renderAppStoreApp(pageId, params, screen) {
                 const raw   = await sendPhoneRequest(sys, usr);
                 const bp = _parseJsonRobust(raw, null);
                 if (!bp) throw new Error('No JSON found');
-                if (!bp.id) bp.id = name.toLowerCase().replace(/\W+/g, '_') + '_' + Date.now();
-                if (!bp.name) bp.name = name;
-                if (!bp.icon) bp.icon = icon;
+                
+                if (!bp.name) bp.name = name || 'Custom App';
+                if (!bp.id) bp.id = bp.name.toLowerCase().replace(/\W+/g, '_') + '_' + Date.now();
+                if (!bp.icon) bp.icon = icon || '📱';
 
                 const ps2 = getPhoneState();
                 ps2.phoneApps = ps2.phoneApps || [];
